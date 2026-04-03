@@ -49,6 +49,47 @@ def get_logo_config():
         "crop": data.get("crop"),
     }
 
+
+def get_debrid_connection_details():
+    config = get_debrid_config() or {}
+    ip = (config.get("ip") or "").strip()
+    username = (config.get("username") or "").strip()
+    password = (config.get("password") or "") or ""
+    return ip, username, password
+
+
+def make_debrid_proxy_response(resp):
+    body = resp.text or ""
+    json_body = None
+    try:
+        json_body = resp.json()
+    except ValueError:
+        json_body = None
+    return jsonify({
+        "status_code": resp.status_code,
+        "ok": resp.ok,
+        "body": body,
+        "json": json_body,
+        "content_type": resp.headers.get("Content-Type", ""),
+    }), resp.status_code if resp.status_code >= 400 else 200
+
+
+def proxy_debrid_post(endpoint_path, payload, failure_message):
+    ip, username, password = get_debrid_connection_details()
+    if not ip or not username:
+        return jsonify({"error": "Debrid client is not configured"}), 400
+    url = f"http://{ip}{endpoint_path}"
+    try:
+        resp = req_lib.post(
+            url,
+            auth=(username, password),
+            json=payload,
+            timeout=10,
+        )
+    except req_lib.RequestException as exc:
+        return jsonify({"error": failure_message, "detail": str(exc)}), 502
+    return make_debrid_proxy_response(resp)
+
 def render_dashboard(initial_section="overview"):
     if initial_section not in TAB_SECTIONS:
         initial_section = "overview"
@@ -126,10 +167,7 @@ def api_save_debrid_config():
 
 @app.route("/api/debrid-queue")
 def api_debrid_queue():
-    config = get_debrid_config()
-    ip = (config.get("ip") or "").strip()
-    username = (config.get("username") or "").strip()
-    password = (config.get("password") or "") or ""
+    ip, username, password = get_debrid_connection_details()
     if not ip or not username:
         return jsonify({"error": "Debrid client is not configured"}), 400
     url = f"http://{ip}/Api/ShikiDashboard/Queue/Public"
@@ -137,58 +175,48 @@ def api_debrid_queue():
         resp = req_lib.get(url, auth=(username, password), timeout=10)
     except req_lib.RequestException as exc:
         return jsonify({"error": "Failed to fetch Debrid queue", "detail": str(exc)}), 502
-    body = resp.text or ""
-    json_body = None
-    try:
-        json_body = resp.json()
-    except ValueError:
-        json_body = None
-    return jsonify({
-        "status_code": resp.status_code,
-        "ok": resp.ok,
-        "body": body,
-        "json": json_body,
-        "content_type": resp.headers.get("Content-Type", ""),
-    }), resp.status_code if resp.status_code >= 400 else 200
+    return make_debrid_proxy_response(resp)
 
 
 @app.route("/api/debrid-ingest-magnet", methods=["POST"])
 def api_debrid_ingest_magnet():
-    config = get_debrid_config()
-    ip = (config.get("ip") or "").strip()
-    username = (config.get("username") or "").strip()
-    password = (config.get("password") or "") or ""
-    if not ip or not username:
-        return jsonify({"error": "Debrid client is not configured"}), 400
     data = request.get_json(silent=True) or {}
     magnet_link = (data.get("magnetLink") or "").strip()
     if not magnet_link:
         return jsonify({"error": "magnetLink is required"}), 400
     if not magnet_link.lower().startswith("magnet:?"):
         return jsonify({"error": "magnetLink must start with magnet:?"}), 400
-    url = f"http://{ip}/Api/ShikiDashboard/IngestMagnetLink"
-    try:
-        resp = req_lib.post(
-            url,
-            auth=(username, password),
-            json={"magnetLink": magnet_link},
-            timeout=10,
-        )
-    except req_lib.RequestException as exc:
-        return jsonify({"error": "Failed to forward magnet link", "detail": str(exc)}), 502
-    body = resp.text or ""
-    json_body = None
-    try:
-        json_body = resp.json()
-    except ValueError:
-        json_body = None
-    return jsonify({
-        "status_code": resp.status_code,
-        "ok": resp.ok,
-        "body": body,
-        "json": json_body,
-        "content_type": resp.headers.get("Content-Type", ""),
-    }), resp.status_code if resp.status_code >= 400 else 200
+    return proxy_debrid_post(
+        "/Api/ShikiDashboard/IngestMagnetLink",
+        {"magnetLink": magnet_link},
+        "Failed to forward magnet link",
+    )
+
+
+@app.route("/api/debrid-edit-queue/remove", methods=["POST"])
+def api_debrid_edit_queue_remove():
+    data = request.get_json(silent=True) or {}
+    torrent_id = data.get("torrentId")
+    if torrent_id is None or str(torrent_id).strip() == "":
+        return jsonify({"error": "torrentId is required"}), 400
+    return proxy_debrid_post(
+        "/Api/ShikiDashboard/EditQueue/Remove",
+        {"torrentId": torrent_id},
+        "Failed to remove torrent from queue",
+    )
+
+
+@app.route("/api/debrid-edit-queue/retry", methods=["POST"])
+def api_debrid_edit_queue_retry():
+    data = request.get_json(silent=True) or {}
+    torrent_id = data.get("torrentId")
+    if torrent_id is None or str(torrent_id).strip() == "":
+        return jsonify({"error": "torrentId is required"}), 400
+    return proxy_debrid_post(
+        "/Api/ShikiDashboard/EditQueue/Retry",
+        {"torrentId": torrent_id},
+        "Failed to retry torrent in queue",
+    )
 
 
 def apply_saved_drive_order(drives):

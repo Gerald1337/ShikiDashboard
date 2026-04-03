@@ -530,6 +530,32 @@ canvas { display:block; width:100% !important; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.debrid-queue-item-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.debrid-queue-action-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+}
+.debrid-queue-action-btn.retry:hover,
+.debrid-queue-action-btn.retry.pending {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.debrid-queue-action-btn.remove:hover,
+.debrid-queue-action-btn.remove.pending {
+  border-color: var(--fail);
+  color: var(--fail);
+}
+.debrid-queue-action-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 .debrid-queue-item-status-pill {
   flex: 0 1 auto;
   min-width: 0;
@@ -836,7 +862,19 @@ canvas { display:block; width:100% !important; }
 .modal-delete-btn:hover { background: rgba(255,23,68,0.1); }
 .btn-primary { background: var(--accent); color: var(--bg); border: none; padding: 9px 20px; border-radius: 7px; font-family: var(--sans); font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px; }
 .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-danger { background: var(--fail); color: #fff; border: none; padding: 9px 20px; border-radius: 7px; font-family: var(--sans); font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px; }
+.btn-danger:disabled { opacity: 0.55; cursor: not-allowed; }
 .btn-secondary { background: none; color: var(--muted); border: 1px solid var(--border); padding: 9px 20px; border-radius: 7px; font-family: var(--sans); font-size: 14px; cursor: pointer; min-height: 44px; }
+.debrid-queue-action-message {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+.debrid-queue-action-message strong {
+  color: var(--accent2);
+}
 
 .logo-modal {
   max-width: 720px;
@@ -1427,6 +1465,27 @@ canvas { display:block; width:100% !important; }
   </div>
 </div>
 
+<div class="modal-overlay" id="debrid-queue-action-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h2 id="debrid-queue-action-title">Torrent Action</h2>
+        <div class="modal-subtitle" id="debrid-queue-action-subtitle">Confirm this change before it is sent to the Debrid client.</div>
+      </div>
+      <button class="icon-btn modal-close-btn" type="button" id="debrid-queue-action-close-btn" onclick="closeDebridQueueActionModal()" title="Close">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+
+    <p class="debrid-queue-action-message" id="debrid-queue-action-message">Choose an action for this torrent.</p>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" type="button" id="debrid-queue-action-cancel-btn" onclick="closeDebridQueueActionModal()">Cancel</button>
+      <button class="btn-primary" type="button" id="debrid-queue-action-confirm-btn" onclick="submitDebridQueueAction()">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
 const SECTION_ROUTES = {
@@ -1454,6 +1513,8 @@ let logoRenderQueued = false;
 let debridConfig = { ip: '', username: '', password: '', updated_at: null };
 let debridQueueTimer = null;
 let debridQueueSnapshot = [];
+let debridQueueActionState = { action: '', torrentId: '', rawTorrentId: null, torrentName: '' };
+let debridQueueActionSubmitting = false;
 let magnetSubmissionInProgress = false;
 let magnetStatusTimer = null;
 
@@ -2964,6 +3025,7 @@ document.getElementById('add-modal').addEventListener('click', e => { if(e.targe
 document.getElementById('reorder-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeReorderModal(); });
 document.getElementById('logo-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeLogoModal(); });
 document.getElementById('debrid-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeDebridModal(); });
+document.getElementById('debrid-queue-action-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeDebridQueueActionModal(); });
 
 async function submitAddService() {
   const name = document.getElementById('svc-name').value.trim();
@@ -3008,6 +3070,145 @@ async function submitAddService() {
   closeAddModal();
   stopSvcPoll();
   await loadServices();
+}
+
+function normalizeTorrentIdValue(torrentId) {
+  return torrentId == null ? '' : String(torrentId).trim();
+}
+
+function getDebridQueueActionMeta(action) {
+  if (action === 'remove') {
+    return {
+      title: 'Remove Torrent',
+      subtitle: 'This removes the torrent from the Debrid queue.',
+      confirmLabel: 'Remove Torrent',
+      confirmClass: 'btn-danger',
+      pendingLabel: 'Removing…',
+      successMessage: 'Torrent removed from queue.',
+      errorMessage: 'Unable to remove torrent from queue.',
+    };
+  }
+  return {
+    title: 'Retry Torrent',
+    subtitle: 'This asks the Debrid client to retry the torrent.',
+    confirmLabel: 'Retry Torrent',
+    confirmClass: 'btn-primary',
+    pendingLabel: 'Retrying…',
+    successMessage: 'Torrent retry requested.',
+    errorMessage: 'Unable to retry torrent.',
+  };
+}
+
+function isDebridQueueActionPending(action, torrentId) {
+  return debridQueueActionSubmitting
+    && debridQueueActionState.action === action
+    && normalizeTorrentIdValue(debridQueueActionState.torrentId) === normalizeTorrentIdValue(torrentId);
+}
+
+function syncDebridQueueActionModal() {
+  const titleEl = document.getElementById('debrid-queue-action-title');
+  const subtitleEl = document.getElementById('debrid-queue-action-subtitle');
+  const messageEl = document.getElementById('debrid-queue-action-message');
+  const confirmBtn = document.getElementById('debrid-queue-action-confirm-btn');
+  const cancelBtn = document.getElementById('debrid-queue-action-cancel-btn');
+  const closeBtn = document.getElementById('debrid-queue-action-close-btn');
+  const meta = getDebridQueueActionMeta(debridQueueActionState.action);
+  const torrentName = debridQueueActionState.torrentName || 'this torrent';
+
+  if (titleEl) titleEl.textContent = meta.title;
+  if (subtitleEl) subtitleEl.textContent = meta.subtitle;
+  if (messageEl) {
+    messageEl.innerHTML = debridQueueActionState.action === 'remove'
+      ? `Remove <strong>${escapeHtml(torrentName)}</strong> from the Debrid queue?`
+      : `Retry <strong>${escapeHtml(torrentName)}</strong> in the Debrid queue?`;
+  }
+  if (confirmBtn) {
+    confirmBtn.textContent = debridQueueActionSubmitting ? meta.pendingLabel : meta.confirmLabel;
+    confirmBtn.className = meta.confirmClass;
+    confirmBtn.disabled = debridQueueActionSubmitting;
+  }
+  if (cancelBtn) cancelBtn.disabled = debridQueueActionSubmitting;
+  if (closeBtn) closeBtn.disabled = debridQueueActionSubmitting;
+}
+
+function openDebridQueueActionModal(action, torrentId, torrentName) {
+  const normalizedAction = action === 'remove' ? 'remove' : 'retry';
+  const normalizedTorrentId = normalizeTorrentIdValue(torrentId);
+  if (!normalizedTorrentId) {
+    setDebridMagnetStatus('This torrent does not include a torrentId yet.', 'error');
+    return;
+  }
+  debridQueueActionState = {
+    action: normalizedAction,
+    torrentId: normalizedTorrentId,
+    rawTorrentId: torrentId,
+    torrentName: torrentName || 'Unnamed torrent',
+  };
+  debridQueueActionSubmitting = false;
+  syncDebridQueueActionModal();
+  const modal = document.getElementById('debrid-queue-action-modal');
+  if (modal) modal.classList.add('open');
+}
+
+function closeDebridQueueActionModal() {
+  if (debridQueueActionSubmitting) return;
+  const modal = document.getElementById('debrid-queue-action-modal');
+  if (modal) modal.classList.remove('open');
+  debridQueueActionState = { action: '', torrentId: '', rawTorrentId: null, torrentName: '' };
+}
+
+function setupDebridQueueActions() {
+  const listEl = document.getElementById('debrid-queue-list');
+  if (listEl) {
+    listEl.addEventListener('click', event => {
+      const button = event.target.closest('[data-debrid-queue-action]');
+      if (!button || button.disabled) return;
+      const normalizedTorrentId = normalizeTorrentIdValue(button.dataset.torrentId);
+      const matchedItem = debridQueueSnapshot.find(
+        item => normalizeTorrentIdValue(item?.torrentId) === normalizedTorrentId
+      );
+      openDebridQueueActionModal(
+        button.dataset.debridQueueAction,
+        matchedItem?.torrentId ?? button.dataset.torrentId,
+        button.dataset.torrentName
+      );
+    });
+  }
+}
+
+async function submitDebridQueueAction() {
+  const torrentId = normalizeTorrentIdValue(debridQueueActionState.torrentId);
+  if (!torrentId || debridQueueActionSubmitting) return;
+  const requestTorrentId = debridQueueActionState.rawTorrentId ?? torrentId;
+
+  const meta = getDebridQueueActionMeta(debridQueueActionState.action);
+  debridQueueActionSubmitting = true;
+  syncDebridQueueActionModal();
+  renderDebridQueueList(debridQueueSnapshot);
+
+  try {
+    const resp = await fetch(`/api/debrid-edit-queue/${debridQueueActionState.action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ torrentId: requestTorrentId }),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const message = payload.error || payload.detail || meta.errorMessage;
+      throw new Error(message);
+    }
+    debridQueueActionSubmitting = false;
+    closeDebridQueueActionModal();
+    setDebridMagnetStatus(meta.successMessage, 'success');
+    await fetchDebridQueue();
+  } catch (err) {
+    console.error(`Failed to ${debridQueueActionState.action} torrent`, err);
+    setDebridMagnetStatus(err?.message || meta.errorMessage, 'error');
+  } finally {
+    debridQueueActionSubmitting = false;
+    syncDebridQueueActionModal();
+    renderDebridQueueList(debridQueueSnapshot);
+  }
 }
 
 function renderDebridInfo() {
@@ -3365,10 +3566,41 @@ function renderDebridQueueList(items) {
       ? `<span class="debrid-queue-item-file-counts">${fileCountsLabel}</span>`
       : '';
     const statusClass = queueStatusClass(statusLabel);
+    const torrentId = normalizeTorrentIdValue(item.torrentId);
+    const removePending = isDebridQueueActionPending('remove', torrentId);
+    const retryPending = isDebridQueueActionPending('retry', torrentId);
+    const hasActionButtons = Boolean(torrentId);
+    const actionButtons = hasActionButtons ? `
+          <div class="debrid-queue-item-actions">
+            <button
+              class="icon-btn debrid-queue-action-btn retry${retryPending ? ' pending spinning' : ''}"
+              type="button"
+              title="Retry torrent"
+              aria-label="Retry torrent"
+              data-debrid-queue-action="retry"
+              data-torrent-id="${escapeHtml(torrentId)}"
+              data-torrent-name="${escapeHtml(name)}"
+              ${debridQueueActionSubmitting ? 'disabled' : ''}>
+              <span class="material-icons">refresh</span>
+            </button>
+            <button
+              class="icon-btn debrid-queue-action-btn remove${removePending ? ' pending spinning' : ''}"
+              type="button"
+              title="Remove torrent"
+              aria-label="Remove torrent"
+              data-debrid-queue-action="remove"
+              data-torrent-id="${escapeHtml(torrentId)}"
+              data-torrent-name="${escapeHtml(name)}"
+              ${debridQueueActionSubmitting ? 'disabled' : ''}>
+              <span class="material-icons">delete</span>
+            </button>
+          </div>`
+      : '';
     return `
       <div class="debrid-queue-item">
         <div class="debrid-queue-item-header">
           <div class="debrid-queue-item-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+          ${actionButtons}
         </div>
         <div class="debrid-queue-item-meta">
           <div class="debrid-queue-item-meta-top">
@@ -3393,6 +3625,7 @@ function renderDebridQueueList(items) {
 fetchLogoConfig().catch(err => console.error('Failed to load app logo', err));
 loadOverviewPanelOrder();
 setupDebridMagnetInput();
+setupDebridQueueActions();
 applyDebridQueueVisibility();
 history.replaceState({ section: currentSection }, '', getSectionRoute(currentSection));
 window.addEventListener('popstate', event => {
