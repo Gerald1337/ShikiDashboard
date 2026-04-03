@@ -2,6 +2,7 @@ from datetime import datetime
 import json
 
 from flask import Flask, jsonify, render_template_string, request
+import requests as req_lib
 from db import (
     get_history,
     get_latest_snapshot_timestamp,
@@ -22,6 +23,8 @@ from db import (
     set_drive_order,
     get_app_setting,
     set_app_setting,
+    get_debrid_config,
+    set_debrid_config,
 )
 from smart import scan_all_drives
 from checks import check_service, kick_service_poll, service_timers
@@ -80,6 +83,49 @@ def api_save_app_logo():
         "crop": crop,
     }))
     return jsonify({"ok": True})
+
+
+@app.route("/api/debrid-config")
+def api_get_debrid_config():
+    return jsonify(get_debrid_config() or {})
+
+
+@app.route("/api/debrid-config", methods=["POST"])
+def api_save_debrid_config():
+    data = request.get_json(silent=True) or {}
+    ip = (data.get("ip") or "").strip()
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+    set_debrid_config(ip, username, password)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/debrid-queue")
+def api_debrid_queue():
+    config = get_debrid_config()
+    ip = (config.get("ip") or "").strip()
+    username = (config.get("username") or "").strip()
+    password = (config.get("password") or "") or ""
+    if not ip or not username:
+        return jsonify({"error": "Debrid client is not configured"}), 400
+    url = f"http://{ip}/Api/ShikiDashboard/Queue/Public"
+    try:
+        resp = req_lib.get(url, auth=(username, password), timeout=10)
+    except req_lib.RequestException as exc:
+        return jsonify({"error": "Failed to fetch Debrid queue", "detail": str(exc)}), 502
+    body = resp.text or ""
+    json_body = None
+    try:
+        json_body = resp.json()
+    except ValueError:
+        json_body = None
+    return jsonify({
+        "status_code": resp.status_code,
+        "ok": resp.ok,
+        "body": body,
+        "json": json_body,
+        "content_type": resp.headers.get("Content-Type", ""),
+    }), resp.status_code if resp.status_code >= 400 else 200
 
 
 def apply_saved_drive_order(drives):

@@ -67,6 +67,15 @@ def init_db():
             value TEXT
         )
     """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS debrid_config (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            ip TEXT,
+            username TEXT,
+            password TEXT,
+            updated_at TEXT
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -98,6 +107,15 @@ def migrate_db():
         CREATE TABLE IF NOT EXISTS app_settings (
             key TEXT PRIMARY KEY,
             value TEXT
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS debrid_config (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            ip TEXT,
+            username TEXT,
+            password TEXT,
+            updated_at TEXT
         )
     """)
 
@@ -241,6 +259,36 @@ def set_app_setting(key, value):
     c.execute(
         "INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
         (key, value)
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_debrid_config():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT ip, username, password, updated_at FROM debrid_config WHERE id=1")
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        return {}
+    return {"ip": row[0] or "", "username": row[1] or "", "password": row[2] or "", "updated_at": row[3]}
+
+
+def set_debrid_config(ip, username, password):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        """
+        INSERT INTO debrid_config (id, ip, username, password, updated_at)
+        VALUES (1, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            ip=excluded.ip,
+            username=excluded.username,
+            password=excluded.password,
+            updated_at=excluded.updated_at
+        """,
+        (ip, username, password, datetime.now().isoformat())
     )
     conn.commit()
     conn.close()

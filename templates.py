@@ -328,6 +328,124 @@ canvas { display:block; width:100% !important; }
   font-size: 12px;
   color: rgba(255, 255, 255, 0.6);
 }
+.debrid-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.debrid-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.debrid-info-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  max-width: 55%;
+}
+.debrid-info-value {
+  font-size: 14px;
+  font-weight: 600;
+  text-align: right;
+}
+.debrid-queue-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.debrid-queue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+}
+.debrid-queue-status {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+  min-height: 20px;
+}
+.debrid-queue-body {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  padding: 8px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 160px;
+  overflow: auto;
+}
+.debrid-queue-list {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.debrid-queue-item {
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.debrid-queue-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--sans);
+}
+.debrid-queue-item-name {
+  font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.debrid-queue-item-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.debrid-progress {
+  height: 8px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.debrid-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: inherit;
+  transition: width 0.35s ease;
+}
+.debrid-queue-empty {
+  font-size: 13px;
+  color: var(--muted);
+  font-family: var(--sans);
+}
 .icon-btn {
   border: 1px solid var(--border);
   background: var(--surface2);
@@ -875,6 +993,52 @@ canvas { display:block; width:100% !important; }
       </div>
     </div>
 
+    <div class="section" id="section-debrid">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Debrid Client</div>
+          <div class="section-subtitle small-muted" id="debrid-status">Not configured</div>
+        </div>
+        <div class="section-actions">
+          <button class="icon-btn" type="button" title="Configure Debrid Client" aria-label="Configure Debrid Client" onclick="openDebridModal()">
+            <span class="material-icons">settings</span>
+          </button>
+        </div>
+      </div>
+      <div class="debrid-panel">
+        <div class="debrid-info-row">
+          <div class="debrid-info-label">Real Debrid Client IP</div>
+          <div class="debrid-info-value" id="debrid-ip">—</div>
+        </div>
+        <div class="debrid-info-row">
+          <div class="debrid-info-label">Username</div>
+          <div class="debrid-info-value" id="debrid-username">—</div>
+        </div>
+        <div class="debrid-info-row">
+          <div class="debrid-info-label">Password</div>
+          <div class="debrid-info-value" id="debrid-password">—</div>
+        </div>
+        <div class="debrid-info-row">
+          <div class="debrid-info-label">Last saved</div>
+          <div class="debrid-info-value small-muted" id="debrid-updated">Not saved yet</div>
+        </div>
+        <p class="section-subtitle small-muted" style="margin-top:8px">
+          Use the settings gear to store your Real Debrid Client connection details.
+        </p>
+        <div class="debrid-queue-card">
+          <div class="debrid-queue-header">
+            <span>Queue probe</span>
+            <span id="debrid-queue-time">—</span>
+          </div>
+          <div class="debrid-queue-status" id="debrid-queue-status">Waiting for configuration…</div>
+          <pre class="debrid-queue-body" id="debrid-queue-body">Response body appears here.</pre>
+        </div>
+        <div class="debrid-queue-list" id="debrid-queue-list">
+          <div class="debrid-queue-empty">Queue data will populate once the proxy succeeds.</div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <nav class="tab-bar">
@@ -886,6 +1050,9 @@ canvas { display:block; width:100% !important; }
     </button>
     <button class="tab-item" id="tab-disks" onclick="navigate('disks')">
       <span class="tab-icon material-icons">storage</span><span>Disks</span>
+    </button>
+    <button class="tab-item" id="tab-debrid" onclick="navigate('debrid')">
+      <span class="tab-icon material-icons">cloud</span><span>Debrid</span>
     </button>
   </nav>
 
@@ -1004,6 +1171,38 @@ canvas { display:block; width:100% !important; }
   </div>
 </div>
 
+<div class="modal-overlay" id="debrid-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h2>Debrid Client</h2>
+        <div class="modal-subtitle">Store the Real Debrid Client connection details used by this dashboard.</div>
+      </div>
+      <button class="icon-btn modal-close-btn" type="button" onclick="closeDebridModal()" title="Close">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Real Debrid Client IP</label>
+      <input class="form-input" id="debrid-ip-input" type="text" placeholder="e.g. 192.168.1.42"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Username</label>
+      <input class="form-input" id="debrid-username-input" type="text"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input class="form-input" id="debrid-password-input" type="password"/>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" type="button" onclick="closeDebridModal()">Cancel</button>
+      <button class="btn-primary" type="button" id="debrid-save-btn" onclick="submitDebridConfig()">Save</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
 let currentSection = 'overview';
@@ -1020,6 +1219,8 @@ let logoEditorCtx = null;
 let logoEditorScale = 1;
 let logoDragState = null;
 let logoRenderQueued = false;
+let debridConfig = { ip: '', username: '', password: '', updated_at: null };
+let debridQueueTimer = null;
 
 const DEFAULT_FAVICON_DATA_URL = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2096%2096%22%3E%3Crect%20width%3D%2296%22%20height%3D%2296%22%20fill%3D%22%230a0c0f%22/%3E%3Ctext%20x%3D%2248%22%20y%3D%2258%22%20text-anchor%3D%22middle%22%20font-family%3D%22Inter%2Csans-serif%22%20font-size%3D%2256%22%20font-weight%3D%22700%22%20fill%3D%22%2300e5ff%22%3ES%3C/text%3E%3C/svg%3E";
 
@@ -1424,6 +1625,7 @@ function formatChartWindowLabel(sec) {
 
 function navigate(section) {
   if (section !== 'services') stopSvcPoll();
+  if (section !== 'debrid') stopDebridQueueMonitor();
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
   document.getElementById('section-' + section).classList.add('active');
@@ -1438,6 +1640,8 @@ function navigate(section) {
     loadDrives();
   } else if (currentSection === 'services') {
     loadServices();
+  } else if (currentSection === 'debrid') {
+    loadDebridConfig();
   }
 }
 
@@ -1445,6 +1649,7 @@ function refreshCurrent(useFresh = false) {
   if (currentSection === 'overview') loadOverview(!useFresh);
   else if (currentSection === 'disks') loadDrives(!useFresh);
   else if (currentSection === 'services') loadServices();
+  else if (currentSection === 'debrid') loadDebridConfig();
 }
 
 function tempClass(t) {
@@ -2344,6 +2549,7 @@ function closeAddModal() {
 document.getElementById('add-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeAddModal(); });
 document.getElementById('reorder-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeReorderModal(); });
 document.getElementById('logo-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeLogoModal(); });
+document.getElementById('debrid-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeDebridModal(); });
 
 async function submitAddService() {
   const name = document.getElementById('svc-name').value.trim();
@@ -2390,10 +2596,160 @@ async function submitAddService() {
   await loadServices();
 }
 
+function renderDebridInfo() {
+  document.getElementById('debrid-ip').textContent = debridConfig.ip || '—';
+  document.getElementById('debrid-username').textContent = debridConfig.username || '—';
+  document.getElementById('debrid-password').textContent = debridConfig.password ? '••••••' : '—';
+  const statusEl = document.getElementById('debrid-status');
+  if (statusEl) statusEl.textContent = debridConfig.ip ? 'Configured' : 'Not configured';
+  const updatedEl = document.getElementById('debrid-updated');
+  if (updatedEl) updatedEl.textContent = debridConfig.updated_at
+    ? `Updated ${new Date(debridConfig.updated_at).toLocaleString()}`
+    : 'Not saved yet';
+}
+
+async function loadDebridConfig() {
+  try {
+    const resp = await fetch('/api/debrid-config');
+    if (!resp.ok) throw new Error('Failed to load Debrid settings');
+    debridConfig = await resp.json() || { ip: '', username: '', password: '', updated_at: null };
+    renderDebridInfo();
+    if (currentSection === 'debrid') startDebridQueueMonitor();
+  } catch (err) {
+    console.error('Failed to load debrid config', err);
+  }
+}
+
+function openDebridModal() {
+  document.getElementById('debrid-ip-input').value = debridConfig.ip || '';
+  document.getElementById('debrid-username-input').value = debridConfig.username || '';
+  document.getElementById('debrid-password-input').value = debridConfig.password || '';
+  document.getElementById('debrid-modal').classList.add('open');
+}
+
+function closeDebridModal() {
+  document.getElementById('debrid-modal').classList.remove('open');
+}
+
+async function submitDebridConfig() {
+  const btn = document.getElementById('debrid-save-btn');
+  const payload = {
+    ip: document.getElementById('debrid-ip-input').value.trim(),
+    username: document.getElementById('debrid-username-input').value.trim(),
+    password: document.getElementById('debrid-password-input').value,
+  };
+  btn.disabled = true;
+  try {
+    const resp = await fetch('/api/debrid-config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      throw new Error('Unable to save Debrid details');
+    }
+    await loadDebridConfig();
+    closeDebridModal();
+  } catch (err) {
+    console.error(err);
+    alert('Failed to save Debrid settings.');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function updateDebridQueueDisplay(status, body, items = []) {
+  const statusEl = document.getElementById('debrid-queue-status');
+  const bodyEl = document.getElementById('debrid-queue-body');
+  const timeEl = document.getElementById('debrid-queue-time');
+  if (statusEl) statusEl.textContent = status;
+  if (bodyEl) bodyEl.textContent = body;
+  if (timeEl) timeEl.textContent = new Date().toLocaleTimeString();
+  renderDebridQueueList(items);
+}
+
+function startDebridQueueMonitor() {
+  if (!debridConfig.ip || !debridConfig.username) {
+    updateDebridQueueDisplay('Waiting for configuration…', 'Provide the Real Debrid IP, username, and password to begin polling.');
+    return;
+  }
+  stopDebridQueueMonitor();
+  fetchDebridQueue();
+  debridQueueTimer = setInterval(fetchDebridQueue, 1000);
+}
+
+function stopDebridQueueMonitor() {
+  if (debridQueueTimer) {
+    clearInterval(debridQueueTimer);
+    debridQueueTimer = null;
+  }
+}
+
+async function fetchDebridQueue() {
+  if (!debridConfig.ip || !debridConfig.username) {
+    updateDebridQueueDisplay('Missing credentials', 'Set the Debrid configuration before polling the queue.');
+    return;
+  }
+  try {
+    const resp = await fetch('/api/debrid-queue', {
+      cache: 'no-cache',
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const errMessage = payload.error || payload.detail || 'Proxy error';
+      throw new Error(errMessage);
+    }
+    let body = payload.body || '';
+    if (!body && payload.json) {
+      body = JSON.stringify(payload.json, null, 2);
+    }
+    if (!body) body = '[empty response]';
+    const status = `HTTP ${payload.status_code || resp.status}`;
+    let items = Array.isArray(payload.json) ? payload.json : [];
+    updateDebridQueueDisplay(status, body, items);
+  } catch (err) {
+    updateDebridQueueDisplay('Proxy error', err?.message || 'Unable to reach endpoint');
+  }
+}
+
+function renderDebridQueueList(items) {
+  const container = document.getElementById('debrid-queue-list');
+  if (!container) return;
+  if (!items.length) {
+    container.innerHTML = '<div class="debrid-queue-empty">No torrents currently queued.</div>';
+    return;
+  }
+  container.innerHTML = items.map(item => {
+    const percent = Number.isFinite(Number(item.downloadedPercent))
+      ? Math.max(0, Math.min(100, Number(item.downloadedPercent)))
+      : null;
+    const percentLabel = percent != null ? `${percent.toFixed(1)}%` : '—';
+    const speed = Number.isFinite(Number(item.currentDownloadSpeedBytesPerSecond))
+      ? formatBytesPerSecond(Number(item.currentDownloadSpeedBytesPerSecond))
+      : '—';
+    const progressWidth = percent != null ? `${percent}%` : '0%';
+    const name = item.name || 'Unnamed torrent';
+    return `
+      <div class="debrid-queue-item">
+        <div class="debrid-queue-item-header">
+          <div class="debrid-queue-item-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+          <div class="debrid-queue-item-meta">
+            <span>${percentLabel}</span>
+            <span>${speed}</span>
+          </div>
+        </div>
+        <div class="debrid-progress">
+          <div class="debrid-progress-fill" style="width:${progressWidth}"></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
 // Load cached SMART data from the database on page load.
 fetchLogoConfig().catch(err => console.error('Failed to load app logo', err));
 loadOverview();
 startHostStatsPoll();
+loadDebridConfig();
 </script>
 </body>
 </html>

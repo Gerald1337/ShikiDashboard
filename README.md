@@ -27,4 +27,4 @@ Lightweight administration dashboard for monitoring SMART-enabled drives, servic
 
 ## Bug fix list
 - Better padding on bottom nav for mobile
-
+- Saving services requires the service to respond before leaving the add service screen
