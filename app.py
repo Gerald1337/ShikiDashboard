@@ -128,6 +128,45 @@ def api_debrid_queue():
     }), resp.status_code if resp.status_code >= 400 else 200
 
 
+@app.route("/api/debrid-ingest-magnet", methods=["POST"])
+def api_debrid_ingest_magnet():
+    config = get_debrid_config()
+    ip = (config.get("ip") or "").strip()
+    username = (config.get("username") or "").strip()
+    password = (config.get("password") or "") or ""
+    if not ip or not username:
+        return jsonify({"error": "Debrid client is not configured"}), 400
+    data = request.get_json(silent=True) or {}
+    magnet_link = (data.get("magnetLink") or "").strip()
+    if not magnet_link:
+        return jsonify({"error": "magnetLink is required"}), 400
+    if not magnet_link.lower().startswith("magnet:?"):
+        return jsonify({"error": "magnetLink must start with magnet:?"}), 400
+    url = f"http://{ip}/Api/ShikiDashboard/IngestMagnetLink"
+    try:
+        resp = req_lib.post(
+            url,
+            auth=(username, password),
+            json={"magnetLink": magnet_link},
+            timeout=10,
+        )
+    except req_lib.RequestException as exc:
+        return jsonify({"error": "Failed to forward magnet link", "detail": str(exc)}), 502
+    body = resp.text or ""
+    json_body = None
+    try:
+        json_body = resp.json()
+    except ValueError:
+        json_body = None
+    return jsonify({
+        "status_code": resp.status_code,
+        "ok": resp.ok,
+        "body": body,
+        "json": json_body,
+        "content_type": resp.headers.get("Content-Type", ""),
+    }), resp.status_code if resp.status_code >= 400 else 200
+
+
 def apply_saved_drive_order(drives):
     order = get_drive_order()
     if not order:

@@ -311,6 +311,18 @@ canvas { display:block; width:100% !important; }
   flex-wrap: wrap;
   margin-bottom: 14px;
 }
+.debrid-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+  width: 100%;
+  margin-bottom: 6px;
+}
+.debrid-header > :first-child {
+  flex: 0 1 auto;
+  min-width: 0;
+}
 .section-header .section-title {
   font-size: 14px;
   font-weight: 600;
@@ -320,6 +332,53 @@ canvas { display:block; width:100% !important; }
   gap: 8px;
   align-items: center;
 }
+.debrid-magnet-area {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+.debrid-magnet-input {
+  width: 100%;
+  min-width: 0;
+  font-size: 13px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+}
+.debrid-header .section-actions {
+  flex: 0 0 auto;
+}
+.debrid-magnet-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.debrid-magnet-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+.debrid-magnet-status {
+  font-size: 12px;
+  color: var(--muted);
+  margin: -4px 52px 2px auto;
+  width: min(100%, 640px);
+}
+.debrid-magnet-status:empty {
+  display: none;
+}
+.debrid-magnet-status.success {
+  color: var(--pass);
+}
+.debrid-magnet-status.error {
+  color: var(--fail);
+}
+@media (max-width: 900px) {
+  .debrid-magnet-status {
+    margin: -4px 0 2px 0;
+    width: 100%;
+  }
+}
 .section-subtitle {
   font-size: 13px;
   color: var(--muted);
@@ -327,32 +386,6 @@ canvas { display:block; width:100% !important; }
 .section-subtitle.small-muted {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.6);
-}
-.debrid-panel {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-  display: grid;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-.debrid-info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.debrid-info-label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--muted);
-  max-width: 55%;
-}
-.debrid-info-value {
-  font-size: 14px;
-  font-weight: 600;
-  text-align: right;
 }
 .debrid-queue-card {
   background: rgba(255, 255, 255, 0.02);
@@ -391,8 +424,14 @@ canvas { display:block; width:100% !important; }
   max-height: 160px;
   overflow: auto;
 }
+.debrid-queue-wrapper {
+  margin-top: 12px;
+}
+.debrid-queue-wrapper.hidden {
+  display: none;
+}
 .debrid-queue-list {
-  margin-top: 14px;
+  margin-top: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -414,6 +453,8 @@ canvas { display:block; width:100% !important; }
   font-family: var(--sans);
 }
 .debrid-queue-item-name {
+  flex: 1 1 auto;
+  min-width: 0;
   font-weight: 600;
   font-size: 14px;
   overflow: hidden;
@@ -422,12 +463,20 @@ canvas { display:block; width:100% !important; }
 }
 .debrid-queue-item-meta {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  flex: 0 0 auto;
+  gap: 4px;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.4px;
   color: var(--muted);
-  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.debrid-queue-item-meta-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 .debrid-progress {
   height: 8px;
@@ -994,37 +1043,28 @@ canvas { display:block; width:100% !important; }
     </div>
 
     <div class="section" id="section-debrid">
-      <div class="section-header">
+      <div class="section-header debrid-header">
         <div>
           <div class="section-title">Debrid Client</div>
           <div class="section-subtitle small-muted" id="debrid-status">Not configured</div>
         </div>
+        <div class="debrid-magnet-area">
+          <input autocomplete="off" class="form-input debrid-magnet-input" id="debrid-magnet-input" type="text" placeholder="Magnet Link"/>
+        </div>
         <div class="section-actions">
+          <button class="icon-btn" type="button" id="debrid-queue-toggle-btn" title="Hide queue panel" aria-label="Hide queue panel" onclick="toggleDebridQueueVisibility()">
+            <span class="material-icons" id="debrid-queue-toggle-icon">expand_less</span>
+          </button>
           <button class="icon-btn" type="button" title="Configure Debrid Client" aria-label="Configure Debrid Client" onclick="openDebridModal()">
             <span class="material-icons">settings</span>
           </button>
         </div>
       </div>
-      <div class="debrid-panel">
-        <div class="debrid-info-row">
-          <div class="debrid-info-label">Real Debrid Client IP</div>
-          <div class="debrid-info-value" id="debrid-ip">—</div>
-        </div>
-        <div class="debrid-info-row">
-          <div class="debrid-info-label">Username</div>
-          <div class="debrid-info-value" id="debrid-username">—</div>
-        </div>
-        <div class="debrid-info-row">
-          <div class="debrid-info-label">Password</div>
-          <div class="debrid-info-value" id="debrid-password">—</div>
-        </div>
-        <div class="debrid-info-row">
-          <div class="debrid-info-label">Last saved</div>
-          <div class="debrid-info-value small-muted" id="debrid-updated">Not saved yet</div>
-        </div>
-        <p class="section-subtitle small-muted" style="margin-top:8px">
-          Use the settings gear to store your Real Debrid Client connection details.
-        </p>
+      <div class="debrid-magnet-status" id="debrid-magnet-status" aria-live="polite"></div>
+      <div class="debrid-queue-list" id="debrid-queue-list">
+        <div class="debrid-queue-empty">Queue data will populate once the proxy succeeds.</div>
+      </div>
+      <div class="debrid-queue-wrapper" id="debrid-queue-wrapper">
         <div class="debrid-queue-card">
           <div class="debrid-queue-header">
             <span>Queue probe</span>
@@ -1032,9 +1072,6 @@ canvas { display:block; width:100% !important; }
           </div>
           <div class="debrid-queue-status" id="debrid-queue-status">Waiting for configuration…</div>
           <pre class="debrid-queue-body" id="debrid-queue-body">Response body appears here.</pre>
-        </div>
-        <div class="debrid-queue-list" id="debrid-queue-list">
-          <div class="debrid-queue-empty">Queue data will populate once the proxy succeeds.</div>
         </div>
       </div>
     </div>
@@ -1212,6 +1249,7 @@ let drivesCache = [];
 let servicesCache = [];
 let hostStatsTimer = null;
 let svcHistoryVisible = false;
+let debridQueueVisible = true;
 let logoConfig = { original_image: null, crop: null };
 let logoEditorImage = null;
 let logoEditorCanvas = null;
@@ -1221,6 +1259,8 @@ let logoDragState = null;
 let logoRenderQueued = false;
 let debridConfig = { ip: '', username: '', password: '', updated_at: null };
 let debridQueueTimer = null;
+let magnetSubmissionInProgress = false;
+let magnetStatusTimer = null;
 
 const DEFAULT_FAVICON_DATA_URL = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2096%2096%22%3E%3Crect%20width%3D%2296%22%20height%3D%2296%22%20fill%3D%22%230a0c0f%22/%3E%3Ctext%20x%3D%2248%22%20y%3D%2258%22%20text-anchor%3D%22middle%22%20font-family%3D%22Inter%2Csans-serif%22%20font-size%3D%2256%22%20font-weight%3D%22700%22%20fill%3D%22%2300e5ff%22%3ES%3C/text%3E%3C/svg%3E";
 
@@ -1820,6 +1860,22 @@ function applyServiceHistoryVisibility() {
   const btn = document.getElementById('services-history-btn');
   if (btn) {
     const label = svcHistoryVisible ? 'Hide service history' : 'Show service history';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+  }
+}
+function toggleDebridQueueVisibility() {
+  debridQueueVisible = !debridQueueVisible;
+  applyDebridQueueVisibility();
+}
+function applyDebridQueueVisibility() {
+  const wrapper = document.getElementById('debrid-queue-wrapper');
+  if (wrapper) wrapper.classList.toggle('hidden', !debridQueueVisible);
+  const icon = document.getElementById('debrid-queue-toggle-icon');
+  if (icon) icon.textContent = debridQueueVisible ? 'expand_less' : 'expand_more';
+  const btn = document.getElementById('debrid-queue-toggle-btn');
+  if (btn) {
+    const label = debridQueueVisible ? 'Hide queue panel' : 'Show queue panel';
     btn.title = label;
     btn.setAttribute('aria-label', label);
   }
@@ -2597,15 +2653,93 @@ async function submitAddService() {
 }
 
 function renderDebridInfo() {
-  document.getElementById('debrid-ip').textContent = debridConfig.ip || '—';
-  document.getElementById('debrid-username').textContent = debridConfig.username || '—';
-  document.getElementById('debrid-password').textContent = debridConfig.password ? '••••••' : '—';
   const statusEl = document.getElementById('debrid-status');
   if (statusEl) statusEl.textContent = debridConfig.ip ? 'Configured' : 'Not configured';
-  const updatedEl = document.getElementById('debrid-updated');
-  if (updatedEl) updatedEl.textContent = debridConfig.updated_at
-    ? `Updated ${new Date(debridConfig.updated_at).toLocaleString()}`
-    : 'Not saved yet';
+}
+
+function setDebridMagnetStatus(message, tone) {
+  const statusEl = document.getElementById('debrid-magnet-status');
+  if (!statusEl) return;
+  statusEl.textContent = message || '';
+  statusEl.classList.toggle('success', tone === 'success');
+  statusEl.classList.toggle('error', tone === 'error');
+  if (magnetStatusTimer) {
+    clearTimeout(magnetStatusTimer);
+    magnetStatusTimer = null;
+  }
+  if (message) {
+    magnetStatusTimer = setTimeout(() => {
+      statusEl.textContent = '';
+      statusEl.classList.remove('success', 'error');
+      magnetStatusTimer = null;
+    }, 5000);
+  }
+}
+
+async function submitMagnetLink(magnetLink, inputElement) {
+  const candidate = (magnetLink || '').trim();
+  if (!candidate) {
+    setDebridMagnetStatus('Paste a magnet link to queue it.', 'error');
+    return;
+  }
+  if (!candidate.toLowerCase().startsWith('magnet:?')) {
+    setDebridMagnetStatus('Only magnet links are supported.', 'error');
+    return;
+  }
+  if (!debridConfig.ip || !debridConfig.username) {
+    setDebridMagnetStatus('Configure the Debrid client before queuing.', 'error');
+    return;
+  }
+  if (magnetSubmissionInProgress) {
+    setDebridMagnetStatus('Already sending a magnet link. Please wait.', 'error');
+    return;
+  }
+
+  magnetSubmissionInProgress = true;
+  if (inputElement) inputElement.disabled = true;
+  setDebridMagnetStatus('Sending magnet link…');
+  try {
+    const resp = await fetch('/api/debrid-ingest-magnet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ magnetLink: candidate }),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const message = payload.error || payload.detail || 'Proxy error';
+      throw new Error(message);
+    }
+    setDebridMagnetStatus('Magnet queued for ingestion!', 'success');
+    if (inputElement) inputElement.value = '';
+  } catch (err) {
+    console.error('Failed to submit magnet link', err);
+    setDebridMagnetStatus(err.message || 'Unable to queue magnet link', 'error');
+  } finally {
+    magnetSubmissionInProgress = false;
+    if (inputElement) inputElement.disabled = false;
+  }
+}
+
+function handleMagnetPaste(event) {
+  const input = event.target;
+  setTimeout(() => {
+    const value = (input?.value || '').trim();
+    if (value) {
+      submitMagnetLink(value, input);
+    }
+  }, 0);
+}
+
+function setupDebridMagnetInput() {
+  const input = document.getElementById('debrid-magnet-input');
+  if (!input) return;
+  input.addEventListener('paste', handleMagnetPaste);
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      submitMagnetLink((input.value || '').trim(), input);
+    }
+  });
 }
 
 async function loadDebridConfig() {
@@ -2723,6 +2857,16 @@ function renderDebridQueueList(items) {
     const percent = Number.isFinite(Number(item.downloadedPercent))
       ? Math.max(0, Math.min(100, Number(item.downloadedPercent)))
       : null;
+    const completedFiles = Number.isFinite(Number(item.completedFilesCount))
+      ? Math.max(0, Math.trunc(Number(item.completedFilesCount)))
+      : null;
+    const activeFiles = Number.isFinite(Number(item.activeFilesCount))
+      ? Math.max(0, Math.trunc(Number(item.activeFilesCount)))
+      : null;
+    const totalFiles = Number.isFinite(Number(item.totalFilesToDownload))
+      ? Math.max(0, Math.trunc(Number(item.totalFilesToDownload)))
+      : null;
+    const fileCountsLabel = `${completedFiles ?? '—'} / ${activeFiles ?? '—'} / ${totalFiles ?? '—'}`;
     const percentLabel = percent != null ? `${percent.toFixed(1)}%` : '—';
     const speed = Number.isFinite(Number(item.currentDownloadSpeedBytesPerSecond))
       ? formatBytesPerSecond(Number(item.currentDownloadSpeedBytesPerSecond))
@@ -2734,8 +2878,13 @@ function renderDebridQueueList(items) {
         <div class="debrid-queue-item-header">
           <div class="debrid-queue-item-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
           <div class="debrid-queue-item-meta">
-            <span>${percentLabel}</span>
-            <span>${speed}</span>
+            <div class="debrid-queue-item-meta-row">
+              <span>${fileCountsLabel}</span>
+            </div>
+            <div class="debrid-queue-item-meta-row">
+              <span>${percentLabel}</span>
+              <span>${speed}</span>
+            </div>
           </div>
         </div>
         <div class="debrid-progress">
@@ -2750,6 +2899,8 @@ fetchLogoConfig().catch(err => console.error('Failed to load app logo', err));
 loadOverview();
 startHostStatsPoll();
 loadDebridConfig();
+setupDebridMagnetInput();
+applyDebridQueueVisibility();
 </script>
 </body>
 </html>
