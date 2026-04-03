@@ -97,6 +97,8 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); min-
   gap: 4px; cursor: pointer; background: none; border: none; color: var(--muted);
   font-family: var(--sans); font-size: 11px; font-weight: 500; padding: 8px 4px 4px;
   transition: color 0.15s; position: relative;
+  text-decoration: none;
+  line-height: 1;
 }
 .tab-item:hover { color: var(--text); }
 .tab-item.active { color: var(--accent); }
@@ -111,6 +113,24 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); min-
 }
 .tab-item .material-icons {
   font-size: 24px;
+}
+.tab-item .tab-badge {
+  position: absolute;
+  top: 8px;
+  right: 22px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--fail);
+  box-shadow: 0 0 0 3px rgba(255, 23, 68, 0.25);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  pointer-events: none;
+}
+.tab-item.tab-alert .tab-badge {
+  opacity: 1;
+  transform: scale(1);
 }
 .material-icons {
   font-family: 'Material Icons';
@@ -443,12 +463,12 @@ canvas { display:block; width:100% !important; }
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 .debrid-queue-item-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   font-family: var(--sans);
 }
@@ -461,22 +481,118 @@ canvas { display:block; width:100% !important; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.debrid-queue-item-status-pill {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 70%;
+  margin-right: auto;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.45px;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.debrid-queue-item-status-pill.status-pill-success {
+  border-color: rgba(0, 230, 118, 0.4);
+  background: rgba(0, 230, 118, 0.14);
+  color: var(--pass);
+}
+.debrid-queue-item-status-pill.status-pill-downloading {
+  border-color: rgba(0, 230, 118, 0.6);
+  background: rgba(0, 230, 118, 0.18);
+  color: var(--pass);
+}
+.debrid-queue-item-status-pill.status-pill-predownload {
+  border-color: rgba(0, 144, 255, 0.5);
+  background: rgba(0, 144, 255, 0.18);
+  color: var(--accent);
+}
+.debrid-queue-item-status-pill.status-pill-queued {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--accent2);
+}
+.debrid-queue-item-status-pill.status-pill-info {
+  border-color: rgba(250, 173, 20, 0.5);
+  background: rgba(250, 173, 20, 0.15);
+  color: var(--accent);
+}
+.debrid-queue-item-status-pill.status-pill-warning {
+  border-color: rgba(255, 213, 0, 0.5);
+  background: rgba(255, 213, 0, 0.15);
+  color: var(--warn);
+}
+.debrid-queue-item-status-pill.status-pill-error {
+  border-color: rgba(255, 23, 68, 0.5);
+  background: rgba(255, 23, 68, 0.15);
+  color: var(--fail);
+}
+.debrid-queue-item-status-pill.status-pill-pending {
+  border-color: rgba(90, 98, 120, 0.4);
+  background: rgba(90, 98, 120, 0.15);
+  color: var(--muted);
+}
+.debrid-queue-item-status-pill.status-pill-muted {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--muted);
+}
 .debrid-queue-item-meta {
   display: flex;
   flex-direction: column;
-  flex: 0 0 auto;
   gap: 4px;
+}
+.debrid-queue-item-meta-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.debrid-queue-item-metrics {
+  display: flex;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+  gap: 8px;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.4px;
   color: var(--muted);
   align-items: flex-end;
+  min-width: 0;
 }
 .debrid-queue-item-meta-row {
   display: flex;
   gap: 8px;
   flex-wrap: nowrap;
+  align-items: center;
   white-space: nowrap;
+}
+.debrid-queue-item-file-counts {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .debrid-queue-item-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .debrid-queue-item-metrics {
+    align-items: flex-start;
+  }
 }
 .debrid-progress {
   height: 8px;
@@ -903,7 +1019,7 @@ canvas { display:block; width:100% !important; }
 
   <div class="content">
 
-    <div class="section active" id="section-overview">
+    <div class="section{% if initial_section == 'overview' %} active{% endif %}" id="section-overview">
       <div class="overview-grid">
         <div class="overview-panel host-panel">
           <div class="panel-header">
@@ -972,7 +1088,7 @@ canvas { display:block; width:100% !important; }
       </div>
     </div>
 
-    <div class="section" id="section-disks">
+    <div class="section{% if initial_section == 'disks' %} active{% endif %}" id="section-disks">
       <div class="summary-strip">
         <div class="summary-card total">
           <div class="summary-label">Total</div>
@@ -1010,7 +1126,7 @@ canvas { display:block; width:100% !important; }
       </div>
     </div>
 
-    <div class="section" id="section-services">
+    <div class="section{% if initial_section == 'services' %} active{% endif %}" id="section-services">
       <div class="summary-strip cols2">
         <div class="summary-card up">
           <div class="summary-label">Online</div>
@@ -1042,7 +1158,7 @@ canvas { display:block; width:100% !important; }
       </div>
     </div>
 
-    <div class="section" id="section-debrid">
+    <div class="section{% if initial_section == 'debrid' %} active{% endif %}" id="section-debrid">
       <div class="section-header debrid-header">
         <div>
           <div class="section-title">Debrid Client</div>
@@ -1052,8 +1168,8 @@ canvas { display:block; width:100% !important; }
           <input autocomplete="off" class="form-input debrid-magnet-input" id="debrid-magnet-input" type="text" placeholder="Magnet Link"/>
         </div>
         <div class="section-actions">
-          <button class="icon-btn" type="button" id="debrid-queue-toggle-btn" title="Hide queue panel" aria-label="Hide queue panel" onclick="toggleDebridQueueVisibility()">
-            <span class="material-icons" id="debrid-queue-toggle-icon">expand_less</span>
+          <button class="icon-btn" type="button" id="debrid-queue-toggle-btn" title="Show queue panel" aria-label="Show queue panel" onclick="toggleDebridQueueVisibility()">
+            <span class="material-icons" id="debrid-queue-toggle-icon">expand_more</span>
           </button>
           <button class="icon-btn" type="button" title="Configure Debrid Client" aria-label="Configure Debrid Client" onclick="openDebridModal()">
             <span class="material-icons">settings</span>
@@ -1064,7 +1180,7 @@ canvas { display:block; width:100% !important; }
       <div class="debrid-queue-list" id="debrid-queue-list">
         <div class="debrid-queue-empty">Queue data will populate once the proxy succeeds.</div>
       </div>
-      <div class="debrid-queue-wrapper" id="debrid-queue-wrapper">
+      <div class="debrid-queue-wrapper hidden" id="debrid-queue-wrapper">
         <div class="debrid-queue-card">
           <div class="debrid-queue-header">
             <span>Queue probe</span>
@@ -1079,18 +1195,20 @@ canvas { display:block; width:100% !important; }
   </div>
 
   <nav class="tab-bar">
-    <button class="tab-item active" id="tab-overview" onclick="navigate('overview')">
+    <a class="tab-item{% if initial_section == 'overview' %} active{% endif %}" id="tab-overview" href="/" onclick="return handleTabClick(event, 'overview')">
       <span class="tab-icon material-icons">home</span><span>Overview</span>
-    </button>
-    <button class="tab-item" id="tab-services" onclick="navigate('services')">
+    </a>
+    <a class="tab-item{% if initial_section == 'services' %} active{% endif %}" id="tab-services" href="/services" onclick="return handleTabClick(event, 'services')">
       <span class="tab-icon material-icons">public</span><span>Services</span>
-    </button>
-    <button class="tab-item" id="tab-disks" onclick="navigate('disks')">
-      <span class="tab-icon material-icons">storage</span><span>Disks</span>
-    </button>
-    <button class="tab-item" id="tab-debrid" onclick="navigate('debrid')">
+    </a>
+    <a class="tab-item{% if initial_section == 'disks' %} active{% endif %}" id="tab-disks" href="/disks" onclick="return handleTabClick(event, 'disks')">
+      <span class="tab-icon material-icons">storage</span>
+      <span class="tab-badge" id="tab-disks-badge" aria-hidden="true"></span>
+      <span>Disks</span>
+    </a>
+    <a class="tab-item{% if initial_section == 'debrid' %} active{% endif %}" id="tab-debrid" href="/debrid" onclick="return handleTabClick(event, 'debrid')">
       <span class="tab-icon material-icons">cloud</span><span>Debrid</span>
-    </button>
+    </a>
   </nav>
 
 </div>
@@ -1242,14 +1360,21 @@ canvas { display:block; width:100% !important; }
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
-let currentSection = 'overview';
+const SECTION_ROUTES = {
+  overview: '/',
+  services: '/services',
+  disks: '/disks',
+  debrid: '/debrid',
+};
+const VALID_SECTIONS = new Set(Object.keys(SECTION_ROUTES));
+let currentSection = {{ initial_section|tojson }};
 const charts = {};
 let nicknames = {};
 let drivesCache = [];
 let servicesCache = [];
 let hostStatsTimer = null;
 let svcHistoryVisible = false;
-let debridQueueVisible = true;
+let debridQueueVisible = false;
 let logoConfig = { original_image: null, crop: null };
 let logoEditorImage = null;
 let logoEditorCanvas = null;
@@ -1663,7 +1788,61 @@ function formatChartWindowLabel(sec) {
   return (sec / 86400) + ' hours';
 }
 
-function navigate(section) {
+function hasDownDrive(drives) {
+  if (!Array.isArray(drives)) return false;
+  return drives.some(d => String(d?.health || '').toUpperCase() === 'FAIL');
+}
+
+function updateDiskTabNotification(drives = drivesCache) {
+  const tab = document.getElementById('tab-disks');
+  const badge = document.getElementById('tab-disks-badge');
+  if (!tab || !badge) return;
+  const needsAttention = hasDownDrive(drives);
+  tab.classList.toggle('tab-alert', needsAttention);
+  badge.setAttribute('aria-hidden', (!needsAttention).toString());
+  tab.setAttribute('aria-label', needsAttention ? 'Disks (drive attention required)' : 'Disks');
+}
+
+function normalizeSection(section) {
+  return VALID_SECTIONS.has(section) ? section : 'overview';
+}
+
+function getSectionRoute(section) {
+  return SECTION_ROUTES[normalizeSection(section)];
+}
+
+function inferSectionFromPath(pathname) {
+  const normalizedPath = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
+  if (normalizedPath === '/' || normalizedPath === '/overview') return 'overview';
+  if (normalizedPath === '/services') return 'services';
+  if (normalizedPath === '/disks') return 'disks';
+  if (normalizedPath === '/debrid') return 'debrid';
+  return 'overview';
+}
+
+function loadSectionData(section, useFresh = false) {
+  if (section === 'overview') {
+    loadOverview(!useFresh);
+  } else if (section === 'disks') {
+    loadDrives(!useFresh);
+  } else if (section === 'services') {
+    loadServices();
+  } else if (section === 'debrid') {
+    loadDebridConfig();
+  }
+}
+
+function navigate(section, options = {}) {
+  const { updateHistory = true, forceReload = false } = options;
+  section = normalizeSection(section);
+  if (!forceReload && section === currentSection) {
+    if (updateHistory) {
+      const route = getSectionRoute(section);
+      if (window.location.pathname !== route) history.replaceState({ section }, '', route);
+    }
+    return;
+  }
+
   if (section !== 'services') stopSvcPoll();
   if (section !== 'debrid') stopDebridQueueMonitor();
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -1674,22 +1853,24 @@ function navigate(section) {
   document.querySelector('.content').scrollTop = 0;
   if (section === 'overview') startHostStatsPoll();
   else stopHostStatsPoll();
-  if (currentSection === 'overview') {
-    loadOverview();
-  } else if (currentSection === 'disks') {
-    loadDrives();
-  } else if (currentSection === 'services') {
-    loadServices();
-  } else if (currentSection === 'debrid') {
-    loadDebridConfig();
+  loadSectionData(section);
+
+  if (updateHistory) {
+    const route = getSectionRoute(section);
+    if (window.location.pathname !== route) {
+      history.pushState({ section }, '', route);
+    }
   }
 }
 
 function refreshCurrent(useFresh = false) {
-  if (currentSection === 'overview') loadOverview(!useFresh);
-  else if (currentSection === 'disks') loadDrives(!useFresh);
-  else if (currentSection === 'services') loadServices();
-  else if (currentSection === 'debrid') loadDebridConfig();
+  loadSectionData(currentSection, useFresh);
+}
+
+function handleTabClick(event, section) {
+  if (event) event.preventDefault();
+  navigate(section);
+  return false;
 }
 
 function tempClass(t) {
@@ -1938,6 +2119,7 @@ async function loadOverview(useCache = true) {
 }
 
 function renderOverviewDrives(drives) {
+  updateDiskTabNotification(drives);
   const el = document.getElementById('ov-drives-list');
   if (!drives.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px">No drives found.</div>'; return; }
   el.innerHTML = drives.map(d => {
@@ -2005,6 +2187,7 @@ async function loadDrives(useCache = true) {
       fetch(useCache ? '/api/drives/cached' : '/api/drives').then(r=>r.json()),
     ]);
     drivesCache = drives;
+    updateDiskTabNotification(drives);
     document.getElementById('s-total').textContent = drives.length;
     document.getElementById('s-healthy').textContent = drives.filter(d=>d.health==='PASS').length;
     document.getElementById('s-failing').textContent = drives.filter(d=>d.health==='FAIL').length;
@@ -2846,6 +3029,31 @@ async function fetchDebridQueue() {
   }
 }
 
+const queueStatusClassMap = {
+  'finished': 'status-pill-success',
+  'files unpacked': 'status-pill-success',
+  'files downloaded to host': 'status-pill-success',
+  'queued for unpacking': 'status-pill-queued',
+  'queued for downloading': 'status-pill-queued',
+  'torrent stalled': 'status-pill-warning',
+  'torrent processing': 'status-pill-info',
+  'torrent waiting for file selection': 'status-pill-pending',
+  'torrent finished, waiting for download links': 'status-pill-pending',
+  'not yet added to provider': 'status-pill-pending',
+  'unknown status': 'status-pill-pending',
+  'torrent uploading': 'status-pill-info',
+  'downloading': 'status-pill-downloading',
+  'torrent downloading': 'status-pill-predownload',
+  'extracting': 'status-pill-info',
+  'error': 'status-pill-error'
+};
+
+function queueStatusClass(status) {
+  const normalized = (status || '').toLowerCase().trim();
+  if (!normalized) return 'status-pill-muted';
+  return queueStatusClassMap[normalized] || 'status-pill-muted';
+}
+
 function renderDebridQueueList(items) {
   const container = document.getElementById('debrid-queue-list');
   if (!container) return;
@@ -2873,17 +3081,29 @@ function renderDebridQueueList(items) {
       : '—';
     const progressWidth = percent != null ? `${percent}%` : '0%';
     const name = item.name || 'Unnamed torrent';
+    const itemStatus = (item.status || '').trim();
+    const statusLabel = itemStatus || 'Status';
+    const countsVisible = [completedFiles, activeFiles, totalFiles].some(
+      count => Number.isFinite(count) && count > 0
+    );
+    const countsFragment = countsVisible
+      ? `<span class="debrid-queue-item-file-counts">${fileCountsLabel}</span>`
+      : '';
+    const statusClass = queueStatusClass(statusLabel);
     return `
       <div class="debrid-queue-item">
         <div class="debrid-queue-item-header">
           <div class="debrid-queue-item-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
-          <div class="debrid-queue-item-meta">
-            <div class="debrid-queue-item-meta-row">
-              <span>${fileCountsLabel}</span>
-            </div>
-            <div class="debrid-queue-item-meta-row">
-              <span>${percentLabel}</span>
-              <span>${speed}</span>
+        </div>
+        <div class="debrid-queue-item-meta">
+          <div class="debrid-queue-item-meta-top">
+            <div class="debrid-queue-item-status-pill ${statusClass}" title="${escapeHtml(statusLabel)}">${escapeHtml(statusLabel)}</div>
+            <div class="debrid-queue-item-metrics">
+              <div class="debrid-queue-item-meta-row">
+                ${countsFragment}
+                <span>${percentLabel}</span>
+                <span>${speed}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -2896,11 +3116,14 @@ function renderDebridQueueList(items) {
 
 // Load cached SMART data from the database on page load.
 fetchLogoConfig().catch(err => console.error('Failed to load app logo', err));
-loadOverview();
-startHostStatsPoll();
-loadDebridConfig();
 setupDebridMagnetInput();
 applyDebridQueueVisibility();
+history.replaceState({ section: currentSection }, '', getSectionRoute(currentSection));
+window.addEventListener('popstate', event => {
+  const section = normalizeSection(event.state?.section || inferSectionFromPath(window.location.pathname));
+  navigate(section, { updateHistory: false, forceReload: true });
+});
+navigate(inferSectionFromPath(window.location.pathname), { updateHistory: false, forceReload: true });
 </script>
 </body>
 </html>

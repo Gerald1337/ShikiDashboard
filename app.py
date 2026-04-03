@@ -32,6 +32,7 @@ from system_stats import get_system_stats
 from templates import HTML
 
 app = Flask(__name__)
+TAB_SECTIONS = {"overview", "services", "disks", "debrid"}
 
 
 def get_logo_config():
@@ -47,9 +48,31 @@ def get_logo_config():
         "crop": data.get("crop"),
     }
 
+def render_dashboard(initial_section="overview"):
+    if initial_section not in TAB_SECTIONS:
+        initial_section = "overview"
+    return render_template_string(HTML, initial_section=initial_section)
+
+
 @app.route("/")
-def index():
-    return render_template_string(HTML)
+@app.route("/overview")
+def overview():
+    return render_dashboard("overview")
+
+
+@app.route("/services")
+def services():
+    return render_dashboard("services")
+
+
+@app.route("/disks")
+def disks():
+    return render_dashboard("disks")
+
+
+@app.route("/debrid")
+def debrid():
+    return render_dashboard("debrid")
 
 
 @app.route("/api/app-logo")
