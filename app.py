@@ -33,6 +33,7 @@ from templates import HTML
 
 app = Flask(__name__)
 TAB_SECTIONS = {"overview", "services", "disks", "debrid"}
+OVERVIEW_PANEL_IDS = ["host", "services", "drives", "debrid"]
 
 
 def get_logo_config():
@@ -207,6 +208,21 @@ def apply_saved_drive_order(drives):
             by_device.pop(device, None)
     return ordered
 
+
+def sanitize_overview_panel_order(order):
+    if not isinstance(order, list):
+        return OVERVIEW_PANEL_IDS.copy()
+    seen = set()
+    sanitized = []
+    for panel in order:
+        if panel in OVERVIEW_PANEL_IDS and panel not in seen:
+            sanitized.append(panel)
+            seen.add(panel)
+    for panel in OVERVIEW_PANEL_IDS:
+        if panel not in seen:
+            sanitized.append(panel)
+    return sanitized
+
 @app.route("/api/drives")
 def api_drives():
     drives = apply_saved_drive_order(scan_all_drives())
@@ -242,6 +258,27 @@ def api_set_drive_order():
         return jsonify({"error": "order must be a list"}), 400
     set_drive_order(order)
     return jsonify({"ok": True})
+
+
+@app.route("/api/overview/order")
+def api_get_overview_order():
+    raw = get_app_setting("overview_panel_order")
+    parsed = None
+    if raw:
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            parsed = None
+    order = sanitize_overview_panel_order(parsed)
+    return jsonify({"order": order})
+
+
+@app.route("/api/overview/order", methods=["POST"])
+def api_save_overview_order():
+    data = request.get_json() or {}
+    order = sanitize_overview_panel_order(data.get("order"))
+    set_app_setting("overview_panel_order", json.dumps(order))
+    return jsonify({"ok": True, "order": order})
 
 @app.route("/api/drives/summary/cached")
 def api_drives_summary_cached():

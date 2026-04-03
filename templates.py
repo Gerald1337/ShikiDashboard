@@ -38,6 +38,11 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); min-
   padding: 0 20px; height: 56px; background: var(--surface);
   border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; flex-shrink: 0;
 }
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .topbar-logo { display: flex; align-items: center; gap: 10px; }
 .logo-button {
   border: none;
@@ -256,6 +261,50 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); min-
   padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px;
 }
 .overview-service-row:last-child { border-bottom: none; }
+.overview-debrid-status {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.overview-debrid-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.overview-debrid-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.overview-debrid-name {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.overview-debrid-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.overview-debrid-meta-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
 .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .status-dot.up { background: var(--pass); box-shadow: 0 0 6px var(--pass); }
 .status-dot.slow { background: var(--slow); box-shadow: 0 0 6px var(--slow); }
@@ -1015,13 +1064,18 @@ canvas { display:block; width:100% !important; }
       </button>
       <h1>Shiki<span>Dashboard</span></h1>
     </div>
+    <div class="topbar-actions">
+      <button class="icon-btn" type="button" title="Reorder overview panels" aria-label="Reorder overview panels" onclick="openReorderModal('overview')">
+        <span class="material-icons">settings</span>
+      </button>
+    </div>
   </div>
 
   <div class="content">
 
     <div class="section{% if initial_section == 'overview' %} active{% endif %}" id="section-overview">
       <div class="overview-grid">
-        <div class="overview-panel host-panel">
+        <div class="overview-panel host-panel" data-panel="host" id="panel-host">
           <div class="panel-header">
             <div class="panel-title-group">
               <span class="material-icons icon-inline">monitor_heart</span>
@@ -1061,7 +1115,7 @@ canvas { display:block; width:100% !important; }
             </div>
           </div>
         </div>
-        <div class="overview-panel">
+        <div class="overview-panel" data-panel="services" id="panel-services">
           <div class="panel-header">
             <div class="panel-title-group">
               <span class="material-icons icon-inline">public</span>
@@ -1073,7 +1127,7 @@ canvas { display:block; width:100% !important; }
             <div class="loading"><div class="loading-spinner"></div></div>
           </div>
         </div>
-        <div class="overview-panel">
+        <div class="overview-panel" data-panel="drives" id="panel-drives">
           <div class="panel-header">
             <div class="panel-title-group">
               <span class="material-icons icon-inline">storage</span>
@@ -1083,6 +1137,21 @@ canvas { display:block; width:100% !important; }
           </div>
           <div class="panel-body" id="ov-drives-list">
             <div class="loading"><div class="loading-spinner"></div></div>
+          </div>
+        </div>
+        <div class="overview-panel" data-panel="debrid" id="panel-debrid">
+          <div class="panel-header">
+            <div class="panel-title-group">
+              <span class="material-icons icon-inline">download</span>
+              <span class="panel-title">Debrid Queue</span>
+            </div>
+            <button class="panel-link" onclick="navigate('debrid')">View all →</button>
+          </div>
+          <div class="panel-body">
+            <div class="overview-debrid-status" id="ov-debrid-status">Loading queue…</div>
+            <div class="overview-debrid-list" id="ov-debrid-list">
+              <div class="loading"><div class="loading-spinner"></div></div>
+            </div>
           </div>
         </div>
       </div>
@@ -1384,6 +1453,7 @@ let logoDragState = null;
 let logoRenderQueued = false;
 let debridConfig = { ip: '', username: '', password: '', updated_at: null };
 let debridQueueTimer = null;
+let debridQueueSnapshot = [];
 let magnetSubmissionInProgress = false;
 let magnetStatusTimer = null;
 
@@ -1823,6 +1893,7 @@ function inferSectionFromPath(pathname) {
 function loadSectionData(section, useFresh = false) {
   if (section === 'overview') {
     loadOverview(!useFresh);
+    loadDebridConfig();
   } else if (section === 'disks') {
     loadDrives(!useFresh);
   } else if (section === 'services') {
@@ -1844,7 +1915,7 @@ function navigate(section, options = {}) {
   }
 
   if (section !== 'services') stopSvcPoll();
-  if (section !== 'debrid') stopDebridQueueMonitor();
+  if (section !== 'debrid' && section !== 'overview') stopDebridQueueMonitor();
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
   document.getElementById('section-' + section).classList.add('active');
@@ -2274,6 +2345,74 @@ function renderDrivesGrid(drives) {
   container.innerHTML = `<div class="drives-grid">${drives.map(renderDrive).join('')}</div>`;
 }
 
+const DEFAULT_OVERVIEW_PANEL_ORDER = ['host', 'services', 'drives', 'debrid'];
+const OVERVIEW_PANEL_METADATA = {
+  host: { label: 'Host Resource Statistics', meta: 'CPU, RAM, and network activity snapshot' },
+  services: { label: 'Service Status', meta: 'External and local health summary' },
+  drives: { label: 'Drive Status', meta: 'Temperature and health overview' },
+  debrid: { label: 'Debrid Queue', meta: 'Active torrent queue' },
+};
+let overviewPanelOrder = DEFAULT_OVERVIEW_PANEL_ORDER.slice();
+
+function sanitizeOverviewPanelOrder(order) {
+  if (!Array.isArray(order)) return DEFAULT_OVERVIEW_PANEL_ORDER.slice();
+  const seen = new Set();
+  const sanitized = [];
+  for (const id of order) {
+    if (OVERVIEW_PANEL_METADATA[id] && !seen.has(id)) {
+      seen.add(id);
+      sanitized.push(id);
+    }
+  }
+  for (const id of DEFAULT_OVERVIEW_PANEL_ORDER) {
+    if (!seen.has(id)) {
+      sanitized.push(id);
+      seen.add(id);
+    }
+  }
+  return sanitized;
+}
+
+function applyOverviewPanelOrder(order = overviewPanelOrder) {
+  const grid = document.querySelector('.overview-grid');
+  if (!grid) return;
+  const panels = Array.from(grid.querySelectorAll('.overview-panel[data-panel]'));
+  const panelMap = {};
+  panels.forEach(panel => { panelMap[panel.dataset.panel] = panel; });
+  order.forEach(id => {
+    const panel = panelMap[id];
+    if (panel) {
+      grid.append(panel);
+      delete panelMap[id];
+    }
+  });
+  Object.values(panelMap).forEach(panel => grid.append(panel));
+}
+
+async function loadOverviewPanelOrder() {
+  try {
+    const resp = await fetch('/api/overview/order');
+    if (!resp.ok) throw new Error('Failed to load overview layout');
+    const payload = await resp.json();
+    overviewPanelOrder = sanitizeOverviewPanelOrder(payload.order);
+  } catch (err) {
+    overviewPanelOrder = DEFAULT_OVERVIEW_PANEL_ORDER.slice();
+  }
+  applyOverviewPanelOrder();
+}
+
+async function saveOverviewPanelOrder(order) {
+  const resp = await fetch('/api/overview/order', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({order}),
+  });
+  if (!resp.ok) {
+    const payload = await resp.json().catch(() => null);
+    throw new Error(payload?.error || resp.statusText || 'Unknown error');
+  }
+}
+
 let reorderState = { type: null, items: [] };
 
 async function saveServiceOrder(orderIds) {
@@ -2287,15 +2426,35 @@ async function saveServiceOrder(orderIds) {
 
 function openReorderModal(type) {
   reorderState.type = type;
-  const items = (type === 'drives' ? drivesCache : servicesCache) || [];
-  reorderState.items = items.slice();
+  let items = [];
+  if (type === 'drives') {
+    items = (drivesCache || []).slice();
+  } else if (type === 'services') {
+    items = (servicesCache || []).slice();
+  } else if (type === 'overview') {
+    const order = overviewPanelOrder.length ? overviewPanelOrder : DEFAULT_OVERVIEW_PANEL_ORDER;
+    items = order.map(id => ({
+      id,
+      label: OVERVIEW_PANEL_METADATA[id]?.label || id,
+      meta: OVERVIEW_PANEL_METADATA[id]?.meta || '',
+    }));
+  }
+  reorderState.items = items;
   const titleEl = document.getElementById('reorder-modal-title');
   const subtitleEl = document.getElementById('reorder-modal-subtitle');
-  if (titleEl) titleEl.textContent = type === 'drives' ? 'Reorder Drives' : 'Reorder Services';
+  if (titleEl) {
+    if (type === 'drives') titleEl.textContent = 'Reorder Drives';
+    else if (type === 'services') titleEl.textContent = 'Reorder Services';
+    else titleEl.textContent = 'Reorder Overview Panels';
+  }
   if (subtitleEl) {
-    subtitleEl.textContent = type === 'drives'
-      ? 'Drives order is saved persistently and applies after every scan.'
-      : 'Service order is saved to the server and affects the Services page.';
+    if (type === 'drives') {
+      subtitleEl.textContent = 'Drives order is saved persistently and applies after every scan.';
+    } else if (type === 'services') {
+      subtitleEl.textContent = 'Service order is saved to the server and affects the Services page.';
+    } else {
+      subtitleEl.textContent = 'Rearrange which sections appear on the overview screen and save your preferred layout.';
+    }
   }
   renderReorderList();
   document.getElementById('reorder-modal')?.classList.add('open');
@@ -2311,12 +2470,18 @@ function renderReorderList() {
   }
   const type = reorderState.type;
   list.innerHTML = items.map((item, idx) => {
-    const label = type === 'drives'
-      ? `${escapeHtml(nicknames[item.device] || item.model || 'Unknown Drive')} · ${escapeHtml(item.device)}`
-      : escapeHtml(item.name || 'Unnamed service');
-    const meta = type === 'drives'
-      ? escapeHtml(item.device)
-      : escapeHtml(item.url || item.local_url || 'Local monitor');
+    let label;
+    let meta;
+    if (type === 'drives') {
+      label = `${escapeHtml(nicknames[item.device] || item.model || 'Unknown Drive')} · ${escapeHtml(item.device)}`;
+      meta = escapeHtml(item.device);
+    } else if (type === 'overview') {
+      label = escapeHtml(item.label || 'Overview panel');
+      meta = escapeHtml(item.meta || 'Overview section');
+    } else {
+      label = escapeHtml(item.name || 'Unnamed service');
+      meta = escapeHtml(item.url || item.local_url || 'Local monitor');
+    }
     return `<li class="reorder-item">
       <div>
         <div class="reorder-label">${label}</div>
@@ -2365,10 +2530,20 @@ async function saveReorderChanges() {
       console.error('Failed to save drive order', err);
       alert('Unable to save drive order. Please try again.');
     }
-  } else {
+  } else if (reorderState.type === 'services') {
     const order = reorderState.items.map(item => item.id);
     if (order.length) await saveServiceOrder(order);
     await loadServices(true);
+  } else if (reorderState.type === 'overview') {
+    const order = sanitizeOverviewPanelOrder(reorderState.items.map(item => item.id));
+    overviewPanelOrder = order.slice();
+    applyOverviewPanelOrder();
+    try {
+      await saveOverviewPanelOrder(order);
+    } catch (err) {
+      console.error('Failed to save overview panel order', err);
+      alert('Unable to save overview panel order. Please try again.');
+    }
   }
   closeReorderModal();
 }
@@ -2840,6 +3015,92 @@ function renderDebridInfo() {
   if (statusEl) statusEl.textContent = debridConfig.ip ? 'Configured' : 'Not configured';
 }
 
+function isOverviewQueueDownloading(item) {
+  if (!item) return false;
+  const status = (item.status || '').toLowerCase();
+  const speed = Number(item.currentDownloadSpeedBytesPerSecond);
+  const statusIndicatesDownload = status.includes('downloading');
+  const speedIndicatesDownload = Number.isFinite(speed) && speed > 0;
+  return statusIndicatesDownload || speedIndicatesDownload;
+}
+
+function sortOverviewQueueItems(items) {
+  return [...items].sort((a, b) => {
+    const aActive = isOverviewQueueDownloading(a);
+    const bActive = isOverviewQueueDownloading(b);
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
+    return 0;
+  });
+}
+
+function isOverviewQueueCompleted(item) {
+  if (!item) return false;
+  const status = (item.status || '').trim();
+  const statusClass = queueStatusClass(status);
+  if (statusClass === 'status-pill-success') return true;
+  const percent = Number(item.downloadedPercent);
+  return Number.isFinite(percent) && percent >= 100;
+}
+
+function formatItemCountLabel(count) {
+  const normalized = Number.isFinite(count) ? Math.max(0, Math.trunc(count)) : 0;
+  return `${normalized} item${normalized === 1 ? '' : 's'}`;
+}
+
+function formatOverviewQueueLabel(totalItems, completedItems = 0) {
+  const queueLabel = `${formatItemCountLabel(totalItems)} in queue`;
+  if (!Number.isFinite(completedItems) || completedItems <= 0) {
+    return queueLabel;
+  }
+  const completedLabel = `${formatItemCountLabel(completedItems)} completed`;
+  return `${queueLabel} · ${completedLabel}`;
+}
+
+function renderOverviewDebridQueue(status, items = []) {
+  const statusEl = document.getElementById('ov-debrid-status');
+  const listEl = document.getElementById('ov-debrid-list');
+  if (statusEl) statusEl.textContent = status || 'Queue unavailable';
+  if (!listEl) return;
+
+  if (!debridConfig.ip || !debridConfig.username) {
+    listEl.innerHTML = '<div class="debrid-queue-empty">Configure Debrid to show the queue overview.</div>';
+    return;
+  }
+  if (!items.length) {
+    listEl.innerHTML = '<div class="debrid-queue-empty">No torrents currently queued.</div>';
+    return;
+  }
+
+  const previewItems = sortOverviewQueueItems(items).slice(0, 3);
+  listEl.innerHTML = previewItems.map(item => {
+    const percent = Number.isFinite(Number(item.downloadedPercent))
+      ? Math.max(0, Math.min(100, Number(item.downloadedPercent)))
+      : null;
+    const speed = Number.isFinite(Number(item.currentDownloadSpeedBytesPerSecond))
+      ? formatBytesPerSecond(Number(item.currentDownloadSpeedBytesPerSecond))
+      : '—';
+    const progressWidth = percent != null ? `${percent}%` : '0%';
+    const percentLabel = percent != null ? `${percent.toFixed(1)}%` : '—';
+    const statusLabel = (item.status || '').trim() || 'Status';
+    const statusClass = queueStatusClass(statusLabel);
+    const name = item.name || 'Unnamed torrent';
+    return `<div class="overview-debrid-row">
+      <div class="overview-debrid-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+      <div class="overview-debrid-meta">
+        <div class="debrid-queue-item-status-pill ${statusClass}" title="${escapeHtml(statusLabel)}">${escapeHtml(statusLabel)}</div>
+        <div class="overview-debrid-meta-right">
+          <span>${percentLabel}</span>
+          <span>${speed}</span>
+        </div>
+      </div>
+      <div class="debrid-progress">
+        <div class="debrid-progress-fill" style="width:${progressWidth}"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function setDebridMagnetStatus(message, tone) {
   const statusEl = document.getElementById('debrid-magnet-status');
   if (!statusEl) return;
@@ -2931,9 +3192,13 @@ async function loadDebridConfig() {
     if (!resp.ok) throw new Error('Failed to load Debrid settings');
     debridConfig = await resp.json() || { ip: '', username: '', password: '', updated_at: null };
     renderDebridInfo();
-    if (currentSection === 'debrid') startDebridQueueMonitor();
+    if (!debridConfig.ip || !debridConfig.username) {
+      renderOverviewDebridQueue('Not configured', []);
+    }
+    if (currentSection === 'debrid' || currentSection === 'overview') startDebridQueueMonitor();
   } catch (err) {
     console.error('Failed to load debrid config', err);
+    renderOverviewDebridQueue('Unable to load configuration', []);
   }
 }
 
@@ -2982,7 +3247,17 @@ function updateDebridQueueDisplay(status, body, items = []) {
   if (statusEl) statusEl.textContent = status;
   if (bodyEl) bodyEl.textContent = body;
   if (timeEl) timeEl.textContent = new Date().toLocaleTimeString();
+  debridQueueSnapshot = Array.isArray(items) ? items : [];
   renderDebridQueueList(items);
+  const totalItems = debridQueueSnapshot.length;
+  const completedItems = debridQueueSnapshot.filter(isOverviewQueueCompleted).length;
+  let overviewStatus = status;
+  if (totalItems) {
+    overviewStatus = formatOverviewQueueLabel(totalItems, completedItems);
+  } else if (status && /^http\s+\d+/i.test(status)) {
+    overviewStatus = 'Queue empty';
+  }
+  renderOverviewDebridQueue(overviewStatus, debridQueueSnapshot);
 }
 
 function startDebridQueueMonitor() {
@@ -3116,6 +3391,7 @@ function renderDebridQueueList(items) {
 
 // Load cached SMART data from the database on page load.
 fetchLogoConfig().catch(err => console.error('Failed to load app logo', err));
+loadOverviewPanelOrder();
 setupDebridMagnetInput();
 applyDebridQueueVisibility();
 history.replaceState({ section: currentSection }, '', getSectionRoute(currentSection));
