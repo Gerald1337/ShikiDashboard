@@ -879,6 +879,81 @@ canvas { display:block; width:100% !important; }
 .logo-modal {
   max-width: 720px;
 }
+@media (max-width: 640px) {
+  :root {
+    --tab-h: 78px;
+  }
+  .section {
+    padding: 18px 14px;
+  }
+  .tab-item {
+    gap: 6px;
+    font-size: 13px;
+    padding: 10px 6px 8px;
+    font-weight: 600;
+    min-height: 62px;
+  }
+  .tab-icon,
+  .tab-item .material-icons {
+    font-size: 28px;
+  }
+  .tab-item .tab-badge {
+    top: 10px;
+    right: 18px;
+    width: 12px;
+    height: 12px;
+  }
+  .icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+  .icon-btn .material-icons {
+    font-size: 24px;
+  }
+  .debrid-queue-action-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 11px;
+  }
+  .expand-btn,
+  .rename-btn,
+  .rename-save,
+  .rename-cancel,
+  .add-service-btn,
+  .svc-btn,
+  .btn-primary,
+  .btn-danger,
+  .btn-secondary,
+  .modal-close-btn {
+    min-height: 44px;
+  }
+  .expand-btn,
+  .rename-save,
+  .rename-cancel,
+  .svc-btn {
+    font-size: 13px;
+    font-weight: 600;
+    padding: 9px 12px;
+  }
+  .rename-btn {
+    font-size: 14px;
+    padding: 8px;
+  }
+  .rename-btn .material-icons {
+    font-size: 20px;
+  }
+  .svc-history-toggle {
+    font-size: 18px;
+    padding: 8px;
+  }
+  .add-service-btn,
+  .btn-primary,
+  .btn-danger,
+  .btn-secondary {
+    font-size: 15px;
+    padding: 11px 18px;
+  }
+}
 .logo-upload-row {
   display: flex;
   flex-wrap: wrap;
