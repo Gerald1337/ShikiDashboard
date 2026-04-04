@@ -549,8 +549,26 @@ def delete_host(host_id):
 def save_host_order(order):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    for index, host_id in enumerate(order, start=1):
+    normalized_order = []
+    seen = set()
+    for host_id in order:
+        if not isinstance(host_id, int) or host_id < 0 or host_id in seen:
+            continue
+        normalized_order.append(host_id)
+        seen.add(host_id)
+
+    c.execute("SELECT id FROM hosts ORDER BY sort_order, id")
+    remote_ids = [row[0] for row in c.fetchall()]
+    remote_order = [host_id for host_id in normalized_order if host_id in remote_ids]
+    remote_order.extend(host_id for host_id in remote_ids if host_id not in remote_order)
+
+    for index, host_id in enumerate(remote_order, start=1):
         c.execute("UPDATE hosts SET sort_order=? WHERE id=?", (index, host_id))
+
+    c.execute(
+        "INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        ("host_order", json.dumps(normalized_order))
+    )
     conn.commit()
     conn.close()
 

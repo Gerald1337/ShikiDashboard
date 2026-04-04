@@ -391,10 +391,14 @@ def api_add_host():
 
 @app.route("/api/hosts/<int:host_id>", methods=["PATCH"])
 def api_update_host(host_id):
-    if host_id == LOCAL_HOST_ID:
-        return jsonify({"error": "local host is built in"}), 400
     data = request.get_json(silent=True) or {}
     name = (data.get("name") or "").strip()
+    if host_id == LOCAL_HOST_ID:
+        if not name:
+            return jsonify({"error": "name required"}), 400
+        set_app_setting("local_host_name", name)
+        kick_host_poll(host_id, delay=0.01)
+        return jsonify({"ok": True})
     host = (data.get("host") or "").strip()
     token = (data.get("token") or "").strip()
     port = parse_int(data.get("port", 8765), 8765, minimum=1, maximum=65535)
@@ -424,7 +428,7 @@ def api_save_host_order():
     normalized_order = []
     for host_id in order:
         parsed = parse_int(host_id, -1)
-        if parsed > 0:
+        if parsed >= 0:
             normalized_order.append(parsed)
     save_host_order(normalized_order)
     return jsonify({"ok": True})

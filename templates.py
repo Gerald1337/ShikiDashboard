@@ -744,32 +744,61 @@ canvas { display:block; width:100% !important; }
 .host-status-badge.live { color: var(--accent); border-color: rgba(0,229,255,0.25); background: rgba(0,229,255,0.08); }
 .host-status-badge.stale { color: #ffab00; border-color: rgba(255,171,0,0.25); background: rgba(255,171,0,0.08); }
 .host-status-badge.offline { color: var(--fail); border-color: rgba(255,23,68,0.3); background: rgba(255,23,68,0.1); }
-.host-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
-}
-.host-stat-tile {
-  background: rgba(255,255,255,0.02);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
-}
-.host-stat-tile-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.7px; }
-.host-stat-tile-value { margin-top: 5px; font-size: 18px; font-weight: 700; }
-.host-stat-tile-sub { margin-top: 4px; font-size: 11px; color: var(--muted); }
 .host-history-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 10px;
+  gap: 12px;
 }
 .host-history-grid .chart-wrap {
   margin: 0;
-  padding: 10px;
+  padding: 12px;
   background: rgba(10,12,15,0.55);
   border: 1px solid var(--border);
   border-radius: 10px;
+}
+.host-chart-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.host-chart-title-wrap {
+  min-width: 0;
+}
+.host-chart-title-wrap .chart-title {
+  margin-bottom: 4px;
+}
+.host-chart-subtitle {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.host-chart-metric {
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+.host-chart-metric-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: 0;
+}
+.host-chart-metric-pair {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.host-chart-metric-pair strong {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
 }
 .host-chart-empty {
   color: var(--muted);
@@ -908,8 +937,18 @@ canvas { display:block; width:100% !important; }
 }
 .form-input:focus, .form-select:focus { border-color: var(--accent); }
 .form-select option { background: var(--bg); }
+.form-input:disabled, .form-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.form-help {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; align-items: center; }
 .modal-delete-btn { color: var(--fail); border-color: var(--fail); }
 .modal-delete-btn:hover { background: rgba(255,23,68,0.1); }
@@ -1544,6 +1583,7 @@ canvas { display:block; width:100% !important; }
     <div class="form-group">
       <label class="form-label">Display Name</label>
       <input class="form-input" id="host-name" type="text" placeholder="e.g. Media PC, NAS, Router VM"/>
+      <div class="form-help" id="host-name-help" style="display:none">An asterisk is added automatically to the dashboard machine name in the Hosts view.</div>
     </div>
 
     <div class="form-row">
@@ -2691,7 +2731,7 @@ function openReorderModal(type) {
   if (type === 'drives') {
     items = (drivesCache || []).slice();
   } else if (type === 'hosts') {
-    items = (hostsCache || []).filter(item => !item.is_local).slice();
+    items = (hostsCache || []).slice();
   } else if (type === 'services') {
     items = (servicesCache || []).slice();
   } else if (type === 'overview') {
@@ -2882,13 +2922,17 @@ function renderHost(host, idx, animate = true) {
     : `Used ${memUsed} / ${memTotal}`;
   const uploadValue = formatBytesPerSecond(latest.upload_bps);
   const downloadValue = formatBytesPerSecond(latest.download_bps);
-  const titleHtml = isLocal
-    ? `<div class="service-name">${escapeHtml(host.name)}</div>`
-    : `<div class="service-name service-title-clickable" onclick="openEditHostModal(${host.id})">${escapeHtml(host.name)}</div>`;
+  const displayName = isLocal ? `${host.name} *` : host.name;
+  const titleHtml = `<div class="service-name service-title-clickable" onclick="openEditHostModal(${host.id})">${escapeHtml(displayName)}</div>`;
   const endpointLabel = isLocal ? 'Source' : 'Endpoint';
-  const intervalValue = isLocal ? 'Built in' : `${host.interval}s`;
   const animationClass = animate ? '' : ' no-animate';
   const animationStyle = animate ? ` style="animation-delay:${idx * 0.05}s"` : '';
+  const cpuValue = formatPercent(latest.cpu_percent);
+  const ramValue = formatPercent(latest.memory_percent);
+  const ramDetail = (memUsed === '—' && memTotal === '—')
+    ? (latest.error || 'Waiting for data')
+    : `${memUsed} used of ${memTotal}`;
+  const netDetail = latest.error || 'Current traffic';
   return `<div class="host-resource-card status-${host.status}${animationClass}" id="host-card-${host.id}" data-id="${host.id}"${animationStyle}>
     <div class="service-header">
       <div class="service-title-row">
@@ -2904,44 +2948,45 @@ function renderHost(host, idx, animate = true) {
     <div class="service-body">
       <div class="service-meta-row">
         <div class="svc-meta-item"><div class="meta-label">${endpointLabel}</div><div class="meta-value" style="font-size:12px">${escapeHtml(host.url)}</div></div>
-        <div class="svc-meta-item"><div class="meta-label">Interval</div><div class="meta-value">${intervalValue}</div></div>
-      </div>
-      <div class="host-stats-grid">
-        <div class="host-stat-tile">
-          <div class="host-stat-tile-label">CPU</div>
-          <div class="host-stat-tile-value">${formatPercent(latest.cpu_percent)}</div>
-          <div class="host-stat-tile-sub">${hostMetricSub('Current usage', formatPercent(latest.cpu_percent), latest.error || 'Waiting for data')}</div>
-        </div>
-        <div class="host-stat-tile">
-          <div class="host-stat-tile-label">RAM</div>
-          <div class="host-stat-tile-value">${formatPercent(latest.memory_percent)}</div>
-          <div class="host-stat-tile-sub">${memorySub}</div>
-        </div>
-        <div class="host-stat-tile">
-          <div class="host-stat-tile-label">Upload</div>
-          <div class="host-stat-tile-value">${uploadValue}</div>
-          <div class="host-stat-tile-sub">${hostMetricSub('Current outbound', uploadValue, latest.error || 'Waiting for data')}</div>
-        </div>
-        <div class="host-stat-tile">
-          <div class="host-stat-tile-label">Download</div>
-          <div class="host-stat-tile-value">${downloadValue}</div>
-          <div class="host-stat-tile-sub">${hostMetricSub('Current inbound', downloadValue, latest.error || 'Waiting for data')}</div>
-        </div>
       </div>
       <div class="host-history-grid">
         <div class="chart-wrap">
-          <div class="chart-title">CPU · last 1 minute (%)</div>
-          <canvas id="host-chart-cpu-${host.id}" height="60"></canvas>
+          <div class="host-chart-head">
+            <div class="host-chart-title-wrap">
+              <div class="chart-title">CPU · last 1 minute (%)</div>
+              <div class="host-chart-subtitle">${escapeHtml(hostMetricSub('Current usage', cpuValue, latest.error || 'Waiting for data'))}</div>
+            </div>
+            <div class="host-chart-metric">${cpuValue}</div>
+          </div>
+          <canvas id="host-chart-cpu-${host.id}" height="86"></canvas>
           <div class="host-chart-empty" id="host-chart-empty-cpu-${host.id}" style="display:none">Waiting for enough samples.</div>
         </div>
         <div class="chart-wrap">
-          <div class="chart-title">RAM · last 1 minute (%)</div>
-          <canvas id="host-chart-ram-${host.id}" height="60"></canvas>
+          <div class="host-chart-head">
+            <div class="host-chart-title-wrap">
+              <div class="chart-title">RAM · last 1 minute (%)</div>
+              <div class="host-chart-subtitle">${escapeHtml(memorySub)}</div>
+            </div>
+            <div class="host-chart-metric-stack">
+              <div class="host-chart-metric">${ramValue}</div>
+              <div class="host-chart-metric-pair">${escapeHtml(ramDetail)}</div>
+            </div>
+          </div>
+          <canvas id="host-chart-ram-${host.id}" height="86"></canvas>
           <div class="host-chart-empty" id="host-chart-empty-ram-${host.id}" style="display:none">Waiting for enough samples.</div>
         </div>
         <div class="chart-wrap">
-          <div class="chart-title">Network · last 1 minute (bytes/sec)</div>
-          <canvas id="host-chart-net-${host.id}" height="60"></canvas>
+          <div class="host-chart-head">
+            <div class="host-chart-title-wrap">
+              <div class="chart-title">Network · last 1 minute (bytes/sec)</div>
+              <div class="host-chart-subtitle">${escapeHtml(netDetail)}</div>
+            </div>
+            <div class="host-chart-metric-stack">
+              <div class="host-chart-metric-pair">Up <strong>${uploadValue}</strong></div>
+              <div class="host-chart-metric-pair">Down <strong>${downloadValue}</strong></div>
+            </div>
+          </div>
+          <canvas id="host-chart-net-${host.id}" height="86"></canvas>
           <div class="host-chart-empty" id="host-chart-empty-net-${host.id}" style="display:none">Waiting for enough samples.</div>
         </div>
       </div>
@@ -2973,7 +3018,12 @@ function buildHostChart(canvasId, emptyId, labels, datasets, options = {}) {
     options: {
       responsive: true,
       animation: false,
-      plugins: { legend: { display: Boolean(options.showLegend) } },
+      plugins: {
+        legend: {
+          display: Boolean(options.showLegend),
+          labels: options.legendLabels || undefined,
+        }
+      },
       scales: {
         x: { ticks: { color: '#5a6278', font: { family: 'DM Mono', size: 9 } }, grid: { color: '#1f2530' } },
         y: {
@@ -3060,6 +3110,12 @@ function renderHostCharts(hostId, samples) {
     ],
     {
       showLegend: true,
+      legendLabels: {
+        usePointStyle: true,
+        pointStyle: 'line',
+        pointStyleWidth: 30,
+        color: '#c7d0df',
+      },
       tickFormatter: value => formatBytesPerSecond(value),
       suggestedMin: 0,
     }
@@ -3135,7 +3191,7 @@ function stopHostsPoll() {
 async function saveHostOrder(orderIds) {
   const order = orderIds || Array.from(document.querySelectorAll('#hosts-container .hosts-grid .host-resource-card'))
     .map(item => Number(item.dataset.id))
-    .filter(id => id > 0);
+    .filter(id => Number.isInteger(id) && id >= 0);
   await fetch('/api/hosts/order', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -3153,22 +3209,39 @@ function openHostModal() {
   document.getElementById('host-port').value = '8765';
   document.getElementById('host-interval').value = '1';
   document.getElementById('host-token').value = '';
+  setHostModalMode(null);
   document.getElementById('host-modal').classList.add('open');
+}
+
+function setHostModalMode(host) {
+  const isLocal = Boolean(host?.is_local);
+  const isEditingHost = _editingHostId !== null;
+  const addressInput = document.getElementById('host-address');
+  const portInput = document.getElementById('host-port');
+  const intervalInput = document.getElementById('host-interval');
+  const tokenInput = document.getElementById('host-token');
+  const deleteBtn = document.getElementById('host-modal-delete-btn');
+  const nameHelp = document.getElementById('host-name-help');
+  addressInput.disabled = isLocal;
+  portInput.disabled = isLocal;
+  intervalInput.disabled = isLocal;
+  tokenInput.disabled = isLocal;
+  if (deleteBtn) deleteBtn.style.display = isLocal ? 'none' : (isEditingHost ? 'block' : 'none');
+  if (nameHelp) nameHelp.style.display = isLocal ? 'block' : 'none';
 }
 
 function openEditHostModal(hostId) {
   const host = hostsCache.find(item => item.id === hostId);
   if (!host) return;
-  if (host.is_local) return;
   _editingHostId = hostId;
-  document.getElementById('host-modal-title').textContent = 'Edit Host';
+  document.getElementById('host-modal-title').textContent = host.is_local ? 'Rename Dashboard Machine' : 'Edit Host';
   document.getElementById('host-modal-submit-btn').textContent = 'Save Changes';
-  document.getElementById('host-modal-delete-btn').style.display = 'block';
   document.getElementById('host-name').value = host.name;
   document.getElementById('host-address').value = host.host;
   document.getElementById('host-port').value = String(host.port || 8765);
   document.getElementById('host-interval').value = String(host.interval || 1);
   document.getElementById('host-token').value = host.token || '';
+  setHostModalMode(host);
   document.getElementById('host-modal').classList.add('open');
 }
 
@@ -3183,18 +3256,21 @@ async function submitHost() {
   const port = parseInt(document.getElementById('host-port').value, 10) || 8765;
   const interval = parseInt(document.getElementById('host-interval').value, 10) || 1;
   const token = document.getElementById('host-token').value.trim();
-  if (!name || !host) {
-    alert('Name and Local IP/Host are required.');
+  const editingHost = _editingHostId != null ? hostsCache.find(item => item.id === _editingHostId) : null;
+  const isLocalEdit = Boolean(editingHost?.is_local);
+  if (!name || (!isLocalEdit && !host)) {
+    alert(isLocalEdit ? 'Name is required.' : 'Name and Local IP/Host are required.');
     return;
   }
   const submitBtn = document.getElementById('host-modal-submit-btn');
   const cancelBtn = submitBtn.previousElementSibling;
   submitBtn.disabled = true;
   cancelBtn.disabled = true;
-  submitBtn.textContent = _editingHostId ? 'Saving…' : 'Adding…';
+  const isEditingHost = _editingHostId !== null;
+  submitBtn.textContent = isEditingHost ? 'Saving…' : 'Adding…';
   const payload = { name, host, port, interval, token };
   try {
-    if (_editingHostId) {
+    if (isEditingHost) {
       const updateResp = await fetch(`/api/hosts/${_editingHostId}`, {
         method: 'PATCH',
         headers: {'Content-Type': 'application/json'},
@@ -3225,14 +3301,14 @@ async function submitHost() {
   } finally {
     submitBtn.disabled = false;
     cancelBtn.disabled = false;
-    submitBtn.textContent = _editingHostId ? 'Save Changes' : 'Add Host';
+    submitBtn.textContent = isEditingHost ? 'Save Changes' : 'Add Host';
   }
   closeHostModal();
   await loadHosts();
 }
 
 async function deleteHostFromModal() {
-  if (!_editingHostId) return;
+  if (_editingHostId === null) return;
   if (!confirm('Remove this host monitor?')) return;
   await fetch(`/api/hosts/${_editingHostId}`, { method: 'DELETE' });
   closeHostModal();

@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 import socket
 import threading
 
@@ -8,6 +9,7 @@ from config import BROWSER_HEADERS
 from db import (
     cleanup_old_host_samples,
     get_all_hosts,
+    get_app_setting,
     get_host_history,
     get_host_latest_sample,
     save_host_sample,
@@ -23,9 +25,10 @@ host_timers = {}
 
 def get_local_host_definition():
     hostname = socket.gethostname()
+    display_name = (get_app_setting("local_host_name", hostname) or "").strip() or hostname
     return {
         "id": LOCAL_HOST_ID,
-        "name": f"{hostname} (This Dashboard)",
+        "name": display_name,
         "host": "localhost",
         "port": 8080,
         "token": "",
@@ -33,6 +36,33 @@ def get_local_host_definition():
         "created_at": None,
         "is_local": True,
     }
+
+
+def get_ordered_host_definitions():
+    local_host = get_local_host_definition()
+    remote_hosts = get_all_hosts()
+    default_hosts = [local_host, *remote_hosts]
+    host_map = {host["id"]: host for host in default_hosts}
+
+    raw_order = get_app_setting("host_order", "[]")
+    try:
+        saved_order = json.loads(raw_order) if raw_order else []
+    except (TypeError, ValueError, json.JSONDecodeError):
+        saved_order = []
+
+    ordered_hosts = []
+    seen = set()
+    for host_id in saved_order:
+        if not isinstance(host_id, int) or host_id in seen:
+            continue
+        host = host_map.get(host_id)
+        if not host:
+            continue
+        ordered_hosts.append(host)
+        seen.add(host_id)
+
+    ordered_hosts.extend(host for host in default_hosts if host["id"] not in seen)
+    return ordered_hosts
 
 
 def build_host_url(host):
@@ -150,7 +180,7 @@ def stop_host_poll(host_id):
 def get_hosts_with_latest():
     hosts = []
     now = datetime.now()
-    for host in [get_local_host_definition(), *get_all_hosts()]:
+    for host in get_ordered_host_definitions():
         latest = get_host_latest_sample(host["id"])
         status = "unknown"
         if latest:
@@ -169,7 +199,7 @@ def get_hosts_with_latest():
 
 
 def get_all_host_history(window_sec=HOST_STATS_WINDOW_SEC):
-    hosts = [get_local_host_definition(), *get_all_hosts()]
+    hosts = get_ordered_host_definitions()
     return {
         str(host["id"]): get_host_history(host["id"], window_sec=window_sec)
         for host in hosts
