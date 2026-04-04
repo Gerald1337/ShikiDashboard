@@ -719,9 +719,62 @@ canvas { display:block; width:100% !important; }
 .add-service-btn:hover { opacity: 0.85; }
 .services-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
 @media (min-width: 700px) { .services-grid { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); } }
+.hosts-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+@media (min-width: 700px) { .hosts-grid { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); } }
 .service-card {
   background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
   overflow: hidden; animation: fadeIn 0.3s ease both;
+}
+.host-resource-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  overflow: hidden; animation: fadeIn 0.3s ease both;
+}
+.host-resource-card.no-animate {
+  animation: none;
+}
+.host-resource-card.status-offline { border-color: rgba(255,23,68,0.35); }
+.host-resource-card.status-stale { border-color: rgba(255,171,0,0.35); }
+.host-resource-card.status-live { border-color: rgba(0,229,255,0.22); }
+.host-resource-card .service-header { align-items: flex-start; }
+.host-address { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 3px; }
+.host-status-badge {
+  padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--border); color: var(--muted); background: rgba(90,98,120,0.15);
+}
+.host-status-badge.live { color: var(--accent); border-color: rgba(0,229,255,0.25); background: rgba(0,229,255,0.08); }
+.host-status-badge.stale { color: #ffab00; border-color: rgba(255,171,0,0.25); background: rgba(255,171,0,0.08); }
+.host-status-badge.offline { color: var(--fail); border-color: rgba(255,23,68,0.3); background: rgba(255,23,68,0.1); }
+.host-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.host-stat-tile {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.host-stat-tile-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.7px; }
+.host-stat-tile-value { margin-top: 5px; font-size: 18px; font-weight: 700; }
+.host-stat-tile-sub { margin-top: 4px; font-size: 11px; color: var(--muted); }
+.host-history-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+.host-history-grid .chart-wrap {
+  margin: 0;
+  padding: 10px;
+  background: rgba(10,12,15,0.55);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.host-chart-empty {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 12px 2px 4px;
 }
 .service-card.svc-down { border-color: rgba(255,23,68,0.35); }
 .service-card.svc-slow { border-color: rgba(0,230,118,0.25); }
@@ -1374,6 +1427,26 @@ canvas { display:block; width:100% !important; }
       </div>
     </div>
 
+    <div class="section{% if initial_section == 'hosts' %} active{% endif %}" id="section-hosts">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Hosts</div>
+          <div class="section-subtitle small-muted">Remote machine resource monitoring with 1-minute charts and 1-hour retention.</div>
+        </div>
+        <div class="section-actions">
+          <button class="icon-btn" type="button" title="Add Host" aria-label="Add Host" onclick="openHostModal()">
+            <span class="material-icons">add</span>
+          </button>
+          <button class="icon-btn" type="button" title="Reorder hosts" onclick="openReorderModal('hosts')">
+            <span class="material-icons">settings</span>
+          </button>
+        </div>
+      </div>
+      <div id="hosts-container">
+        <div class="loading"><div class="loading-spinner"></div>Loading…</div>
+      </div>
+    </div>
+
   </div>
 
   <nav class="tab-bar">
@@ -1382,6 +1455,9 @@ canvas { display:block; width:100% !important; }
     </a>
     <a class="tab-item{% if initial_section == 'services' %} active{% endif %}" id="tab-services" href="/services" onclick="return handleTabClick(event, 'services')">
       <span class="tab-icon material-icons">public</span><span>Services</span>
+    </a>
+    <a class="tab-item{% if initial_section == 'hosts' %} active{% endif %}" id="tab-hosts" href="/hosts" onclick="return handleTabClick(event, 'hosts')">
+      <span class="tab-icon material-icons">devices</span><span>Hosts</span>
     </a>
     <a class="tab-item{% if initial_section == 'disks' %} active{% endif %}" id="tab-disks" href="/disks" onclick="return handleTabClick(event, 'disks')">
       <span class="tab-icon material-icons">storage</span>
@@ -1457,6 +1533,46 @@ canvas { display:block; width:100% !important; }
       <div style="flex:1"></div>
       <button class="btn-secondary" onclick="closeAddModal()">Cancel</button>
       <button class="btn-primary" id="modal-submit-btn" onclick="submitAddService()">Add Service</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="host-modal">
+  <div class="modal">
+    <h2 id="host-modal-title">Add Host Monitor</h2>
+
+    <div class="form-group">
+      <label class="form-label">Display Name</label>
+      <input class="form-input" id="host-name" type="text" placeholder="e.g. Media PC, NAS, Router VM"/>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Local IP / Host</label>
+        <input class="form-input" id="host-address" type="text" placeholder="e.g. 192.168.1.25"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Port</label>
+        <input class="form-input" id="host-port" type="number" value="8765" min="1" max="65535"/>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Poll Interval (sec)</label>
+        <input class="form-input" id="host-interval" type="number" value="1" min="1" max="60"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Shared Token</label>
+        <input class="form-input" id="host-token" type="text" placeholder="Optional"/>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary modal-delete-btn" id="host-modal-delete-btn" onclick="deleteHostFromModal()" style="display:none" title="Remove host"><span class="material-icons">delete</span></button>
+      <div style="flex:1"></div>
+      <button class="btn-secondary" onclick="closeHostModal()">Cancel</button>
+      <button class="btn-primary" id="host-modal-submit-btn" onclick="submitHost()">Add Host</button>
     </div>
   </div>
 </div>
@@ -1566,6 +1682,7 @@ canvas { display:block; width:100% !important; }
 const SECTION_ROUTES = {
   overview: '/',
   services: '/services',
+  hosts: '/hosts',
   disks: '/disks',
   debrid: '/debrid',
 };
@@ -1575,7 +1692,9 @@ const charts = {};
 let nicknames = {};
 let drivesCache = [];
 let servicesCache = [];
+let hostsCache = [];
 let hostStatsTimer = null;
+let hostsTimer = null;
 let svcHistoryVisible = false;
 let debridQueueVisible = false;
 let logoConfig = { original_image: null, crop: null };
@@ -1592,6 +1711,7 @@ let debridQueueActionState = { action: '', torrentId: '', rawTorrentId: null, to
 let debridQueueActionSubmitting = false;
 let magnetSubmissionInProgress = false;
 let magnetStatusTimer = null;
+let _editingHostId = null;
 
 const DEFAULT_FAVICON_DATA_URL = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2096%2096%22%3E%3Crect%20width%3D%2296%22%20height%3D%2296%22%20fill%3D%22%230a0c0f%22/%3E%3Ctext%20x%3D%2248%22%20y%3D%2258%22%20text-anchor%3D%22middle%22%20font-family%3D%22Inter%2Csans-serif%22%20font-size%3D%2256%22%20font-weight%3D%22700%22%20fill%3D%22%2300e5ff%22%3ES%3C/text%3E%3C/svg%3E";
 
@@ -2021,6 +2141,7 @@ function inferSectionFromPath(pathname) {
   const normalizedPath = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
   if (normalizedPath === '/' || normalizedPath === '/overview') return 'overview';
   if (normalizedPath === '/services') return 'services';
+  if (normalizedPath === '/hosts') return 'hosts';
   if (normalizedPath === '/disks') return 'disks';
   if (normalizedPath === '/debrid') return 'debrid';
   return 'overview';
@@ -2030,6 +2151,8 @@ function loadSectionData(section, useFresh = false) {
   if (section === 'overview') {
     loadOverview(!useFresh);
     loadDebridConfig();
+  } else if (section === 'hosts') {
+    loadHosts();
   } else if (section === 'disks') {
     loadDrives(!useFresh);
   } else if (section === 'services') {
@@ -2051,6 +2174,7 @@ function navigate(section, options = {}) {
   }
 
   if (section !== 'services') stopSvcPoll();
+  if (section !== 'hosts') stopHostsPoll();
   if (section !== 'debrid' && section !== 'overview') stopDebridQueueMonitor();
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
@@ -2060,6 +2184,7 @@ function navigate(section, options = {}) {
   document.querySelector('.content').scrollTop = 0;
   if (section === 'overview') startHostStatsPoll();
   else stopHostStatsPoll();
+  if (section === 'hosts') startHostsPoll();
   loadSectionData(section);
 
   if (updateHistory) {
@@ -2565,6 +2690,8 @@ function openReorderModal(type) {
   let items = [];
   if (type === 'drives') {
     items = (drivesCache || []).slice();
+  } else if (type === 'hosts') {
+    items = (hostsCache || []).filter(item => !item.is_local).slice();
   } else if (type === 'services') {
     items = (servicesCache || []).slice();
   } else if (type === 'overview') {
@@ -2580,12 +2707,15 @@ function openReorderModal(type) {
   const subtitleEl = document.getElementById('reorder-modal-subtitle');
   if (titleEl) {
     if (type === 'drives') titleEl.textContent = 'Reorder Drives';
+    else if (type === 'hosts') titleEl.textContent = 'Reorder Hosts';
     else if (type === 'services') titleEl.textContent = 'Reorder Services';
     else titleEl.textContent = 'Reorder Overview Panels';
   }
   if (subtitleEl) {
     if (type === 'drives') {
       subtitleEl.textContent = 'Drives order is saved persistently and applies after every scan.';
+    } else if (type === 'hosts') {
+      subtitleEl.textContent = 'Host order is saved to the server and affects the Hosts page.';
     } else if (type === 'services') {
       subtitleEl.textContent = 'Service order is saved to the server and affects the Services page.';
     } else {
@@ -2611,6 +2741,9 @@ function renderReorderList() {
     if (type === 'drives') {
       label = `${escapeHtml(nicknames[item.device] || item.model || 'Unknown Drive')} · ${escapeHtml(item.device)}`;
       meta = escapeHtml(item.device);
+    } else if (type === 'hosts') {
+      label = escapeHtml(item.name || 'Unnamed host');
+      meta = escapeHtml(`${item.host || ''}:${item.port || 8765}`);
     } else if (type === 'overview') {
       label = escapeHtml(item.label || 'Overview panel');
       meta = escapeHtml(item.meta || 'Overview section');
@@ -2670,6 +2803,10 @@ async function saveReorderChanges() {
     const order = reorderState.items.map(item => item.id);
     if (order.length) await saveServiceOrder(order);
     await loadServices(true);
+  } else if (reorderState.type === 'hosts') {
+    const order = reorderState.items.map(item => item.id);
+    if (order.length) await saveHostOrder(order);
+    await loadHosts();
   } else if (reorderState.type === 'overview') {
     const order = sanitizeOverviewPanelOrder(reorderState.items.map(item => item.id));
     overviewPanelOrder = order.slice();
@@ -2721,6 +2858,386 @@ async function saveNickname(id, device) {
   document.getElementById(id+'-rename-row').classList.remove('open');
 }
 function cancelRename(id) { document.getElementById(id+'-rename-row').classList.remove('open'); }
+
+// ---- Hosts ----
+
+function formatHostStatus(status) {
+  if (status === 'live') return 'Live';
+  if (status === 'stale') return 'Stale';
+  if (status === 'offline') return 'Offline';
+  return 'Unknown';
+}
+
+function hostMetricSub(label, value, fallback) {
+  return value && value !== '—' ? label : fallback;
+}
+
+function renderHost(host, idx, animate = true) {
+  const latest = host.latest || {};
+  const isLocal = Boolean(host.is_local);
+  const memUsed = formatMemoryBytes(latest.memory_used_bytes);
+  const memTotal = formatMemoryBytes(latest.memory_total_bytes);
+  const memorySub = (memUsed === '—' && memTotal === '—')
+    ? (latest.error || 'Waiting for data')
+    : `Used ${memUsed} / ${memTotal}`;
+  const uploadValue = formatBytesPerSecond(latest.upload_bps);
+  const downloadValue = formatBytesPerSecond(latest.download_bps);
+  const titleHtml = isLocal
+    ? `<div class="service-name">${escapeHtml(host.name)}</div>`
+    : `<div class="service-name service-title-clickable" onclick="openEditHostModal(${host.id})">${escapeHtml(host.name)}</div>`;
+  const endpointLabel = isLocal ? 'Source' : 'Endpoint';
+  const intervalValue = isLocal ? 'Built in' : `${host.interval}s`;
+  const animationClass = animate ? '' : ' no-animate';
+  const animationStyle = animate ? ` style="animation-delay:${idx * 0.05}s"` : '';
+  return `<div class="host-resource-card status-${host.status}${animationClass}" id="host-card-${host.id}" data-id="${host.id}"${animationStyle}>
+    <div class="service-header">
+      <div class="service-title-row">
+        <div>
+          ${titleHtml}
+          <div class="host-address">${escapeHtml(host.host)}:${host.port}</div>
+        </div>
+      </div>
+      <div class="svc-badges">
+        <span class="host-status-badge ${host.status}">${formatHostStatus(host.status)}</span>
+      </div>
+    </div>
+    <div class="service-body">
+      <div class="service-meta-row">
+        <div class="svc-meta-item"><div class="meta-label">${endpointLabel}</div><div class="meta-value" style="font-size:12px">${escapeHtml(host.url)}</div></div>
+        <div class="svc-meta-item"><div class="meta-label">Interval</div><div class="meta-value">${intervalValue}</div></div>
+      </div>
+      <div class="host-stats-grid">
+        <div class="host-stat-tile">
+          <div class="host-stat-tile-label">CPU</div>
+          <div class="host-stat-tile-value">${formatPercent(latest.cpu_percent)}</div>
+          <div class="host-stat-tile-sub">${hostMetricSub('Current usage', formatPercent(latest.cpu_percent), latest.error || 'Waiting for data')}</div>
+        </div>
+        <div class="host-stat-tile">
+          <div class="host-stat-tile-label">RAM</div>
+          <div class="host-stat-tile-value">${formatPercent(latest.memory_percent)}</div>
+          <div class="host-stat-tile-sub">${memorySub}</div>
+        </div>
+        <div class="host-stat-tile">
+          <div class="host-stat-tile-label">Upload</div>
+          <div class="host-stat-tile-value">${uploadValue}</div>
+          <div class="host-stat-tile-sub">${hostMetricSub('Current outbound', uploadValue, latest.error || 'Waiting for data')}</div>
+        </div>
+        <div class="host-stat-tile">
+          <div class="host-stat-tile-label">Download</div>
+          <div class="host-stat-tile-value">${downloadValue}</div>
+          <div class="host-stat-tile-sub">${hostMetricSub('Current inbound', downloadValue, latest.error || 'Waiting for data')}</div>
+        </div>
+      </div>
+      <div class="host-history-grid">
+        <div class="chart-wrap">
+          <div class="chart-title">CPU · last 1 minute (%)</div>
+          <canvas id="host-chart-cpu-${host.id}" height="60"></canvas>
+          <div class="host-chart-empty" id="host-chart-empty-cpu-${host.id}" style="display:none">Waiting for enough samples.</div>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart-title">RAM · last 1 minute (%)</div>
+          <canvas id="host-chart-ram-${host.id}" height="60"></canvas>
+          <div class="host-chart-empty" id="host-chart-empty-ram-${host.id}" style="display:none">Waiting for enough samples.</div>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart-title">Network · last 1 minute (bytes/sec)</div>
+          <canvas id="host-chart-net-${host.id}" height="60"></canvas>
+          <div class="host-chart-empty" id="host-chart-empty-net-${host.id}" style="display:none">Waiting for enough samples.</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function destroyHostCharts(hostId) {
+  ['cpu', 'ram', 'net'].forEach(metric => {
+    const key = `host-${metric}-${hostId}`;
+    if (charts[key]) {
+      charts[key].destroy();
+      delete charts[key];
+    }
+  });
+}
+
+function buildHostChart(canvasId, emptyId, labels, datasets, options = {}) {
+  const canvas = document.getElementById(canvasId);
+  const emptyEl = document.getElementById(emptyId);
+  if (!canvas) return null;
+  const hasPoints = datasets.some(dataset => Array.isArray(dataset.data) && dataset.data.length > 1);
+  canvas.style.display = hasPoints ? 'block' : 'none';
+  if (emptyEl) emptyEl.style.display = hasPoints ? 'none' : 'block';
+  if (!hasPoints) return null;
+  return new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      animation: false,
+      plugins: { legend: { display: Boolean(options.showLegend) } },
+      scales: {
+        x: { ticks: { color: '#5a6278', font: { family: 'DM Mono', size: 9 } }, grid: { color: '#1f2530' } },
+        y: {
+          ticks: {
+            color: '#5a6278',
+            font: { family: 'DM Mono', size: 9 },
+            callback: options.tickFormatter || undefined,
+          },
+          grid: { color: '#1f2530' },
+          suggestedMin: options.suggestedMin,
+          suggestedMax: options.suggestedMax,
+        }
+      }
+    }
+  });
+}
+
+function renderHostCharts(hostId, samples) {
+  destroyHostCharts(hostId);
+  const labels = samples.map(sample => new Date(sample.timestamp).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' }));
+  const cpuChart = buildHostChart(
+    `host-chart-cpu-${hostId}`,
+    `host-chart-empty-cpu-${hostId}`,
+    labels,
+    [{
+      data: samples.map(sample => sample.reachable ? sample.cpu_percent : null),
+      borderColor: '#00e5ff',
+      backgroundColor: 'rgba(0,229,255,0.08)',
+      borderWidth: 2,
+      pointRadius: 0,
+      fill: true,
+      tension: 0.35,
+      spanGaps: false,
+    }],
+    { suggestedMin: 0, suggestedMax: 100 }
+  );
+  if (cpuChart) charts[`host-cpu-${hostId}`] = cpuChart;
+
+  const ramChart = buildHostChart(
+    `host-chart-ram-${hostId}`,
+    `host-chart-empty-ram-${hostId}`,
+    labels,
+    [{
+      data: samples.map(sample => sample.reachable ? sample.memory_percent : null),
+      borderColor: '#a78bfa',
+      backgroundColor: 'rgba(167,139,250,0.08)',
+      borderWidth: 2,
+      pointRadius: 0,
+      fill: true,
+      tension: 0.35,
+      spanGaps: false,
+    }],
+    { suggestedMin: 0, suggestedMax: 100 }
+  );
+  if (ramChart) charts[`host-ram-${hostId}`] = ramChart;
+
+  const netChart = buildHostChart(
+    `host-chart-net-${hostId}`,
+    `host-chart-empty-net-${hostId}`,
+    labels,
+    [
+      {
+        label: 'Upload',
+        data: samples.map(sample => sample.reachable ? sample.upload_bps : null),
+        borderColor: '#ffab00',
+        backgroundColor: 'rgba(255,171,0,0.06)',
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: false,
+        tension: 0.3,
+        spanGaps: false,
+      },
+      {
+        label: 'Download',
+        data: samples.map(sample => sample.reachable ? sample.download_bps : null),
+        borderColor: '#00e676',
+        backgroundColor: 'rgba(0,230,118,0.06)',
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: false,
+        tension: 0.3,
+        spanGaps: false,
+      }
+    ],
+    {
+      showLegend: true,
+      tickFormatter: value => formatBytesPerSecond(value),
+      suggestedMin: 0,
+    }
+  );
+  if (netChart) charts[`host-net-${hostId}`] = netChart;
+}
+
+async function loadHosts() {
+  try {
+    hostsCache.forEach(host => destroyHostCharts(host.id));
+    const [hosts, historyMap] = await Promise.all([
+      fetch('/api/hosts').then(r => r.json()),
+      fetch('/api/hosts/history?window=60').then(r => r.json()),
+    ]);
+    hostsCache = hosts;
+    const container = document.getElementById('hosts-container');
+    if (!hosts.length) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon"><span class="material-icons">devices</span></div><p>No hosts configured. Click <strong>+ Add Host</strong> to monitor a machine on your LAN.</p></div>`;
+      return;
+    }
+    container.innerHTML = `<div class="hosts-grid">${hosts.map(renderHost).join('')}</div>`;
+    hosts.forEach(host => renderHostCharts(host.id, historyMap[String(host.id)] || []));
+  } catch (err) {
+    console.error(err);
+    const container = document.getElementById('hosts-container');
+    if (container) {
+      container.innerHTML = `<div class="empty-state"><p style="color:var(--fail)">Failed to load host monitors: ${escapeHtml(err.message || 'Unknown error')}</p></div>`;
+    }
+  }
+}
+
+async function softRefreshHosts() {
+  const container = document.getElementById('hosts-container');
+  if (!container || !hostsCache.length) {
+    await loadHosts();
+    return;
+  }
+  try {
+    const [hosts, historyMap] = await Promise.all([
+      fetch('/api/hosts').then(r => r.json()),
+      fetch('/api/hosts/history?window=60').then(r => r.json()),
+    ]);
+    const previousIds = hostsCache.map(item => item.id).join(',');
+    const nextIds = hosts.map(item => item.id).join(',');
+    hostsCache = hosts;
+    if (previousIds !== nextIds) {
+      await loadHosts();
+      return;
+    }
+    hosts.forEach((host, idx) => {
+      const card = document.getElementById(`host-card-${host.id}`);
+      if (!card) return;
+      card.outerHTML = renderHost(host, idx, false);
+      renderHostCharts(host.id, historyMap[String(host.id)] || []);
+    });
+  } catch (err) {
+    console.error('Failed to refresh hosts', err);
+  }
+}
+
+function startHostsPoll() {
+  stopHostsPoll();
+  hostsTimer = setInterval(softRefreshHosts, 1000);
+}
+
+function stopHostsPoll() {
+  if (hostsTimer) {
+    clearInterval(hostsTimer);
+    hostsTimer = null;
+  }
+}
+
+async function saveHostOrder(orderIds) {
+  const order = orderIds || Array.from(document.querySelectorAll('#hosts-container .hosts-grid .host-resource-card'))
+    .map(item => Number(item.dataset.id))
+    .filter(id => id > 0);
+  await fetch('/api/hosts/order', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({order})
+  });
+}
+
+function openHostModal() {
+  _editingHostId = null;
+  document.getElementById('host-modal-title').textContent = 'Add Host Monitor';
+  document.getElementById('host-modal-submit-btn').textContent = 'Add Host';
+  document.getElementById('host-modal-delete-btn').style.display = 'none';
+  document.getElementById('host-name').value = '';
+  document.getElementById('host-address').value = '';
+  document.getElementById('host-port').value = '8765';
+  document.getElementById('host-interval').value = '1';
+  document.getElementById('host-token').value = '';
+  document.getElementById('host-modal').classList.add('open');
+}
+
+function openEditHostModal(hostId) {
+  const host = hostsCache.find(item => item.id === hostId);
+  if (!host) return;
+  if (host.is_local) return;
+  _editingHostId = hostId;
+  document.getElementById('host-modal-title').textContent = 'Edit Host';
+  document.getElementById('host-modal-submit-btn').textContent = 'Save Changes';
+  document.getElementById('host-modal-delete-btn').style.display = 'block';
+  document.getElementById('host-name').value = host.name;
+  document.getElementById('host-address').value = host.host;
+  document.getElementById('host-port').value = String(host.port || 8765);
+  document.getElementById('host-interval').value = String(host.interval || 1);
+  document.getElementById('host-token').value = host.token || '';
+  document.getElementById('host-modal').classList.add('open');
+}
+
+function closeHostModal() {
+  document.getElementById('host-modal').classList.remove('open');
+  _editingHostId = null;
+}
+
+async function submitHost() {
+  const name = document.getElementById('host-name').value.trim();
+  const host = document.getElementById('host-address').value.trim();
+  const port = parseInt(document.getElementById('host-port').value, 10) || 8765;
+  const interval = parseInt(document.getElementById('host-interval').value, 10) || 1;
+  const token = document.getElementById('host-token').value.trim();
+  if (!name || !host) {
+    alert('Name and Local IP/Host are required.');
+    return;
+  }
+  const submitBtn = document.getElementById('host-modal-submit-btn');
+  const cancelBtn = submitBtn.previousElementSibling;
+  submitBtn.disabled = true;
+  cancelBtn.disabled = true;
+  submitBtn.textContent = _editingHostId ? 'Saving…' : 'Adding…';
+  const payload = { name, host, port, interval, token };
+  try {
+    if (_editingHostId) {
+      const updateResp = await fetch(`/api/hosts/${_editingHostId}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+      });
+      if (!updateResp.ok) {
+        const err = await updateResp.json().catch(() => null);
+        throw new Error(err?.error || 'Failed to save host');
+      }
+      await fetch(`/api/hosts/${_editingHostId}/check`, { method: 'POST' });
+    } else {
+      const response = await fetch('/api/hosts', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => null);
+        throw new Error(err?.error || 'Failed to add host');
+      }
+      const result = await response.json();
+      if (result.id) await fetch(`/api/hosts/${result.id}/check`, { method: 'POST' });
+    }
+  } catch (err) {
+    console.error(err);
+    alert(err.message || 'Unable to save host.');
+    return;
+  } finally {
+    submitBtn.disabled = false;
+    cancelBtn.disabled = false;
+    submitBtn.textContent = _editingHostId ? 'Save Changes' : 'Add Host';
+  }
+  closeHostModal();
+  await loadHosts();
+}
+
+async function deleteHostFromModal() {
+  if (!_editingHostId) return;
+  if (!confirm('Remove this host monitor?')) return;
+  await fetch(`/api/hosts/${_editingHostId}`, { method: 'DELETE' });
+  closeHostModal();
+  await loadHosts();
+}
 
 // ---- Services ----
 
@@ -3097,6 +3614,7 @@ function closeAddModal() {
   _editingServiceId = null;
 }
 document.getElementById('add-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeAddModal(); });
+document.getElementById('host-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeHostModal(); });
 document.getElementById('reorder-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeReorderModal(); });
 document.getElementById('logo-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeLogoModal(); });
 document.getElementById('debrid-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeDebridModal(); });

@@ -25,15 +25,41 @@ from db import (
     set_app_setting,
     get_debrid_config,
     set_debrid_config,
+    get_all_hosts,
+    add_host,
+    update_host,
+    delete_host,
+    save_host_order,
+    get_host_history,
 )
 from smart import scan_all_drives
 from checks import check_service, kick_service_poll, service_timers
+from host_monitor import (
+    HOST_STATS_WINDOW_SEC,
+    LOCAL_HOST_ID,
+    get_all_host_history,
+    get_hosts_with_latest,
+    kick_host_poll,
+    stop_host_poll,
+)
 from system_stats import get_system_stats
 from templates import HTML
 
 app = Flask(__name__)
-TAB_SECTIONS = {"overview", "services", "disks", "debrid"}
+TAB_SECTIONS = {"overview", "services", "hosts", "disks", "debrid"}
 OVERVIEW_PANEL_IDS = ["host", "services", "drives", "debrid"]
+
+
+def parse_int(value, default, minimum=None, maximum=None):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = default
+    if minimum is not None:
+        parsed = max(minimum, parsed)
+    if maximum is not None:
+        parsed = min(maximum, parsed)
+    return parsed
 
 
 def get_logo_config():
@@ -110,6 +136,11 @@ def services():
 @app.route("/disks")
 def disks():
     return render_dashboard("disks")
+
+
+@app.route("/hosts")
+def hosts():
+    return render_dashboard("hosts")
 
 
 @app.route("/debrid")
@@ -324,6 +355,93 @@ def api_drives_summary_cached():
 @app.route("/api/system-stats")
 def api_system_stats():
     return jsonify(get_system_stats())
+
+
+@app.route("/api/hosts")
+def api_get_hosts():
+    return jsonify(get_hosts_with_latest())
+
+
+@app.route("/api/hosts/history")
+def api_get_hosts_history():
+    window_sec = parse_int(request.args.get("window", HOST_STATS_WINDOW_SEC), HOST_STATS_WINDOW_SEC, minimum=10, maximum=3600)
+    return jsonify(get_all_host_history(window_sec=window_sec))
+
+
+@app.route("/api/hosts/<int:host_id>/history")
+def api_get_host_history(host_id):
+    window_sec = parse_int(request.args.get("window", HOST_STATS_WINDOW_SEC), HOST_STATS_WINDOW_SEC, minimum=10, maximum=3600)
+    return jsonify(get_host_history(host_id, window_sec=window_sec))
+
+
+@app.route("/api/hosts", methods=["POST"])
+def api_add_host():
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    host = (data.get("host") or "").strip()
+    token = (data.get("token") or "").strip()
+    port = parse_int(data.get("port", 8765), 8765, minimum=1, maximum=65535)
+    interval = parse_int(data.get("interval", 1), 1, minimum=1, maximum=60)
+    if not name or not host:
+        return jsonify({"error": "name and host required"}), 400
+    host_id = add_host(name, host, port, token, interval)
+    kick_host_poll(host_id)
+    return jsonify({"ok": True, "id": host_id})
+
+
+@app.route("/api/hosts/<int:host_id>", methods=["PATCH"])
+def api_update_host(host_id):
+    if host_id == LOCAL_HOST_ID:
+        return jsonify({"error": "local host is built in"}), 400
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    host = (data.get("host") or "").strip()
+    token = (data.get("token") or "").strip()
+    port = parse_int(data.get("port", 8765), 8765, minimum=1, maximum=65535)
+    interval = parse_int(data.get("interval", 1), 1, minimum=1, maximum=60)
+    if not name or not host:
+        return jsonify({"error": "name and host required"}), 400
+    update_host(host_id, name, host, port, token, interval)
+    kick_host_poll(host_id)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/hosts/<int:host_id>", methods=["DELETE"])
+def api_delete_host(host_id):
+    if host_id == LOCAL_HOST_ID:
+        return jsonify({"error": "local host is built in"}), 400
+    stop_host_poll(host_id)
+    delete_host(host_id)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/hosts/order", methods=["POST"])
+def api_save_host_order():
+    data = request.get_json(silent=True) or {}
+    order = data.get("order")
+    if not isinstance(order, list):
+        return jsonify({"error": "order must be a list of host IDs"}), 400
+    normalized_order = []
+    for host_id in order:
+        parsed = parse_int(host_id, -1)
+        if parsed > 0:
+            normalized_order.append(parsed)
+    save_host_order(normalized_order)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/hosts/<int:host_id>/check", methods=["POST"])
+def api_host_check_now(host_id):
+    if host_id != LOCAL_HOST_ID:
+        host = next((item for item in get_all_hosts() if item["id"] == host_id), None)
+        if not host:
+            return jsonify({"error": "not found"}), 404
+    else:
+        host = {"id": LOCAL_HOST_ID}
+    if not host:
+        return jsonify({"error": "not found"}), 404
+    kick_host_poll(host_id, delay=0.01)
+    return jsonify({"ok": True})
 
 @app.route("/api/history/<path:device>")
 def api_history(device):

@@ -76,6 +76,35 @@ def init_db():
             updated_at TEXT
         )
     """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS hosts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            host TEXT NOT NULL,
+            port INTEGER NOT NULL DEFAULT 8765,
+            token TEXT,
+            interval INTEGER NOT NULL DEFAULT 3,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS host_samples (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            host_id INTEGER NOT NULL,
+            timestamp TEXT NOT NULL,
+            reachable INTEGER NOT NULL DEFAULT 0,
+            error TEXT,
+            cpu_percent REAL,
+            memory_percent REAL,
+            memory_used_bytes INTEGER,
+            memory_total_bytes INTEGER,
+            upload_bps INTEGER,
+            download_bps INTEGER,
+            sampled_at REAL,
+            FOREIGN KEY(host_id) REFERENCES hosts(id)
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -118,6 +147,52 @@ def migrate_db():
             updated_at TEXT
         )
     """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS hosts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            host TEXT NOT NULL,
+            port INTEGER NOT NULL DEFAULT 8765,
+            token TEXT,
+            interval INTEGER NOT NULL DEFAULT 3,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS host_samples (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            host_id INTEGER NOT NULL,
+            timestamp TEXT NOT NULL,
+            reachable INTEGER NOT NULL DEFAULT 0,
+            error TEXT,
+            cpu_percent REAL,
+            memory_percent REAL,
+            memory_used_bytes INTEGER,
+            memory_total_bytes INTEGER,
+            upload_bps INTEGER,
+            download_bps INTEGER,
+            sampled_at REAL,
+            FOREIGN KEY(host_id) REFERENCES hosts(id)
+        )
+    """)
+
+    c.execute("PRAGMA table_info(hosts)")
+    host_cols = [row[1] for row in c.fetchall()]
+    if 'port' not in host_cols:
+        c.execute("ALTER TABLE hosts ADD COLUMN port INTEGER NOT NULL DEFAULT 8765")
+    if 'token' not in host_cols:
+        c.execute("ALTER TABLE hosts ADD COLUMN token TEXT")
+    if 'interval' not in host_cols:
+        c.execute("ALTER TABLE hosts ADD COLUMN interval INTEGER NOT NULL DEFAULT 3")
+    if 'sort_order' not in host_cols:
+        c.execute("ALTER TABLE hosts ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
+        c.execute("UPDATE hosts SET sort_order = id")
+
+    c.execute("PRAGMA table_info(host_samples)")
+    host_sample_cols = [row[1] for row in c.fetchall()]
+    if host_sample_cols and 'sampled_at' not in host_sample_cols:
+        c.execute("ALTER TABLE host_samples ADD COLUMN sampled_at REAL")
 
     conn.commit()
     conn.close()
@@ -413,3 +488,169 @@ def cleanup_old_service_checks():
     conn.close()
     if deleted > 0:
         print(f"  [cleanup] Removed {deleted} expired service check records (>24h old)")
+
+
+# --- Hosts DB ---
+
+def get_all_hosts():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        "SELECT id, name, host, port, token, interval, created_at FROM hosts ORDER BY sort_order, id"
+    )
+    rows = c.fetchall()
+    conn.close()
+    return [{
+        "id": r[0],
+        "name": r[1],
+        "host": r[2],
+        "port": r[3],
+        "token": r[4] or "",
+        "interval": r[5],
+        "created_at": r[6],
+    } for r in rows]
+
+
+def add_host(name, host, port, token, interval):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT COALESCE(MAX(sort_order), 0) FROM hosts")
+    max_sort = c.fetchone()[0] or 0
+    c.execute(
+        "INSERT INTO hosts (name, host, port, token, interval, sort_order, created_at) VALUES (?,?,?,?,?,?,?)",
+        (name, host, int(port), token or None, int(interval), max_sort + 1, datetime.now().isoformat())
+    )
+    host_id = c.lastrowid
+    conn.commit()
+    conn.close()
+    return host_id
+
+
+def update_host(host_id, name, host, port, token, interval):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        "UPDATE hosts SET name=?, host=?, port=?, token=?, interval=? WHERE id=?",
+        (name, host, int(port), token or None, int(interval), host_id)
+    )
+    conn.commit()
+    conn.close()
+
+
+def delete_host(host_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM host_samples WHERE host_id=?", (host_id,))
+    c.execute("DELETE FROM hosts WHERE id=?", (host_id,))
+    conn.commit()
+    conn.close()
+
+
+def save_host_order(order):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    for index, host_id in enumerate(order, start=1):
+        c.execute("UPDATE hosts SET sort_order=? WHERE id=?", (index, host_id))
+    conn.commit()
+    conn.close()
+
+
+def save_host_sample(host_id, reachable, error=None, stats=None):
+    stats = stats or {}
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        """
+        INSERT INTO host_samples (
+            host_id, timestamp, reachable, error, cpu_percent, memory_percent,
+            memory_used_bytes, memory_total_bytes, upload_bps, download_bps, sampled_at
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        """,
+        (
+            host_id,
+            datetime.now().isoformat(),
+            1 if reachable else 0,
+            error,
+            stats.get("cpu_percent"),
+            stats.get("memory_percent"),
+            stats.get("memory_used_bytes"),
+            stats.get("memory_total_bytes"),
+            stats.get("upload_bps"),
+            stats.get("download_bps"),
+            stats.get("sampled_at"),
+        )
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_host_latest_sample(host_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        """
+        SELECT timestamp, reachable, error, cpu_percent, memory_percent, memory_used_bytes,
+               memory_total_bytes, upload_bps, download_bps, sampled_at
+        FROM host_samples
+        WHERE host_id=?
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (host_id,)
+    )
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "timestamp": row[0],
+        "reachable": bool(row[1]),
+        "error": row[2],
+        "cpu_percent": row[3],
+        "memory_percent": row[4],
+        "memory_used_bytes": row[5],
+        "memory_total_bytes": row[6],
+        "upload_bps": row[7],
+        "download_bps": row[8],
+        "sampled_at": row[9],
+    }
+
+
+def get_host_history(host_id, window_sec=60, limit=None):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    cutoff = (datetime.now() - timedelta(seconds=max(1, int(window_sec)))).isoformat()
+    query = """
+        SELECT timestamp, reachable, error, cpu_percent, memory_percent, upload_bps, download_bps
+        FROM host_samples
+        WHERE host_id=? AND timestamp >= ?
+        ORDER BY id ASC
+    """
+    params = [host_id, cutoff]
+    if limit is not None:
+        query += " LIMIT ?"
+        params.append(int(limit))
+    c.execute(query, tuple(params))
+    rows = c.fetchall()
+    conn.close()
+    return [{
+        "timestamp": r[0],
+        "reachable": bool(r[1]),
+        "error": r[2],
+        "cpu_percent": r[3],
+        "memory_percent": r[4],
+        "upload_bps": r[5],
+        "download_bps": r[6],
+    } for r in rows]
+
+
+def cleanup_old_host_samples():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    cutoff = (datetime.now() - timedelta(hours=1)).isoformat()
+    c.execute("DELETE FROM host_samples WHERE timestamp < ?", (cutoff,))
+    deleted = c.rowcount
+    conn.commit()
+    conn.close()
+    if deleted > 0:
+        print(f"  [cleanup] Removed {deleted} expired host sample records (>1h old)")

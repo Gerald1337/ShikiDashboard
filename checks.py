@@ -5,7 +5,7 @@ import threading
 import time
 import requests as req_lib
 from config import BROWSER_HEADERS, REACHABLE_CODES
-from db import get_all_services, save_service_check, cleanup_old_service_checks
+from db import get_all_services, save_service_check, cleanup_old_service_checks, cleanup_old_host_samples
 from smart import scan_all_drives
 
 service_timers = {}
@@ -110,3 +110,7 @@ def background_cleanup():
             cleanup_old_service_checks()
         except Exception as e:
             print(f"  [cleanup] Error: {e}")
+        try:
+            cleanup_old_host_samples()
+        except Exception as e:
+            print(f"  [cleanup] Host cleanup error: {e}")
