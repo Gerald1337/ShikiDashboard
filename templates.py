@@ -1410,6 +1410,28 @@ canvas { display:block; width:100% !important; }
   </div>
 </div>
 
+<div class="modal-overlay" id="overview-host-widget-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h2>Host Widget Settings</h2>
+        <div class="modal-subtitle">Choose which host this overview widget should display.</div>
+      </div>
+      <button class="icon-btn modal-close-btn" type="button" onclick="closeOverviewHostWidgetModal()" title="Close">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="overview-host-widget-select">Host</label>
+      <select class="form-select" id="overview-host-widget-select"></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" type="button" onclick="closeOverviewHostWidgetModal()">Cancel</button>
+      <button class="btn-primary" type="button" id="overview-host-widget-save-btn" onclick="submitOverviewHostWidgetModal()">Save Host</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="logo-modal">
   <div class="modal logo-modal">
     <div class="modal-header">
@@ -1553,6 +1575,7 @@ let hasLoadedOverviewServiceData = false;
 let hasLoadedHostStats = false;
 let hasLoadedOverviewDebrid = false;
 let overviewWidgetRenameState = { instanceId: null, saving: false };
+let overviewHostWidgetState = { instanceId: null, saving: false };
 let debridQueueActionState = { action: '', torrentId: '', rawTorrentId: null, torrentName: '' };
 let debridQueueActionSubmitting = false;
 let magnetSubmissionInProgress = false;
@@ -2140,13 +2163,18 @@ function setUpdated(timestamp) {
   const textEl = document.getElementById('disks-updated-text');
   if (textEl) textEl.textContent = label;
 }
+function normalizeOverviewHostWidgetHostId(value) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
+}
+
 function fetchHostStats() {
-  return fetch('/api/system-stats')
+  return fetch('/api/hosts')
     .then(r => r.json())
     .then(data => updateHostStats(data))
     .catch(err => {
       console.error('Failed to load host stats', err);
-      updateHostStats(null);
+      updateHostStats([]);
     });
 }
 
@@ -2164,39 +2192,54 @@ function stopHostStatsPoll() {
 }
 
 function updateHostStats(stats) {
-  stats = stats || {};
-  latestHostStats = stats;
+  const hosts = Array.isArray(stats) ? stats : [];
+  latestHostStats = hosts;
   hasLoadedHostStats = true;
+  hostsCache = hosts;
   const panels = Array.from(document.querySelectorAll('.overview-panel[data-widget-type="host_resources"]'));
   if (!panels.length) return;
-  const available = Boolean(stats.available);
-  const statusLabel = available ? 'Live data' : (stats.error || 'Stats unavailable');
-
-  const cpuValue = formatPercent(stats.cpu_percent);
-  const ramValue = formatPercent(stats.memory_percent);
-  const uploadValue = formatBytesPerSecond(stats.upload_bps);
-  const downloadValue = formatBytesPerSecond(stats.download_bps);
-  const derivedRamUsedBytes = Number.isFinite(stats.memory_percent) && Number.isFinite(stats.memory_total_bytes)
-    ? Math.round((stats.memory_total_bytes * stats.memory_percent) / 100)
-    : stats.memory_used_bytes;
-  const usedMem = formatMemoryBytes(derivedRamUsedBytes);
-  const totalMem = formatMemoryBytes(stats.memory_total_bytes);
-  const ramSub = (usedMem === '—' && totalMem === '—') ? statusLabel : `Used ${usedMem} / ${totalMem}`;
-  const uploadSub = Number.isFinite(stats.upload_bps) ? '' : statusLabel;
-  const downloadSub = Number.isFinite(stats.download_bps) ? '' : statusLabel;
+  const hostMap = new Map(hosts.map(host => [host.id, host]));
 
   panels.forEach(panel => {
+    const instanceId = panel.dataset.widgetInstance || '';
+    const widget = getOverviewWidgetInstance(instanceId);
+    const selectedHostId = normalizeOverviewHostWidgetHostId(
+      panel.dataset.selectedHostId ?? widget?.config?.host_id
+    );
+    panel.dataset.selectedHostId = String(selectedHostId);
+    const host = hostMap.get(selectedHostId);
+    const latest = host?.latest || {};
+    const available = Boolean(latest.reachable);
+    const fallbackStatus = hosts.length ? 'Selected host unavailable' : 'No hosts configured';
+    const statusLabel = host
+      ? `${host.name || 'Unnamed host'} · ${available ? 'Live data' : (latest.error || 'Stats unavailable')}`
+      : fallbackStatus;
+    const cpuValue = host ? formatPercent(latest.cpu_percent) : '—';
+    const ramValue = host ? formatPercent(latest.memory_percent) : '—';
+    const uploadValue = host ? formatBytesPerSecond(latest.upload_bps) : '—';
+    const downloadValue = host ? formatBytesPerSecond(latest.download_bps) : '—';
+    const derivedRamUsedBytes = Number.isFinite(latest.memory_percent) && Number.isFinite(latest.memory_total_bytes)
+      ? Math.round((latest.memory_total_bytes * latest.memory_percent) / 100)
+      : latest.memory_used_bytes;
+    const usedMem = formatMemoryBytes(derivedRamUsedBytes);
+    const totalMem = formatMemoryBytes(latest.memory_total_bytes);
+    const detailStatus = host ? (latest.error || 'Stats unavailable') : fallbackStatus;
+    const ramSub = (usedMem === '—' && totalMem === '—') ? detailStatus : `Used ${usedMem} / ${totalMem}`;
+    const uploadSub = host && Number.isFinite(latest.upload_bps) ? '' : detailStatus;
+    const downloadSub = host && Number.isFinite(latest.download_bps) ? '' : detailStatus;
+    const statusEl = panel.querySelector('[data-role="host-panel-status"]');
     const cpuValueEl = panel.querySelector('[data-role="cpu-value"]');
     const ramValueEl = panel.querySelector('[data-role="ram-value"]');
     const uploadValueEl = panel.querySelector('[data-role="upload-value"]');
     const downloadValueEl = panel.querySelector('[data-role="download-value"]');
+    if (statusEl) statusEl.textContent = statusLabel;
     if (cpuValueEl) cpuValueEl.textContent = cpuValue;
     if (ramValueEl) ramValueEl.textContent = ramValue;
     if (uploadValueEl) uploadValueEl.textContent = uploadValue;
     if (downloadValueEl) downloadValueEl.textContent = downloadValue;
     const cpuSubEl = panel.querySelector('[data-role="cpu-sub"]');
     const ramSubEl = panel.querySelector('[data-role="ram-sub"]');
-    if (cpuSubEl) cpuSubEl.textContent = available ? '' : statusLabel;
+    if (cpuSubEl) cpuSubEl.textContent = available ? '' : detailStatus;
     if (ramSubEl) ramSubEl.textContent = ramSub;
     const uploadSubEl = panel.querySelector('[data-role="upload-sub"]');
     const downloadSubEl = panel.querySelector('[data-role="download-sub"]');
@@ -2813,6 +2856,71 @@ async function submitOverviewWidgetRename() {
     console.error('Failed to rename overview widget', err);
     alert('Unable to rename overview widget. Please try again.');
     overviewWidgetRenameState.saving = false;
+    if (saveBtn) saveBtn.disabled = false;
+  }
+}
+
+async function openOverviewHostWidgetModal(instanceId) {
+  const widget = getOverviewWidgetInstance(instanceId);
+  const modal = document.getElementById('overview-host-widget-modal');
+  const select = document.getElementById('overview-host-widget-select');
+  const saveBtn = document.getElementById('overview-host-widget-save-btn');
+  if (!widget || !modal || !select) return;
+  overviewHostWidgetState = { instanceId, saving: false };
+  if (saveBtn) saveBtn.disabled = false;
+  try {
+    const resp = await fetch('/api/hosts');
+    if (!resp.ok) throw new Error('Failed to load hosts');
+    const hosts = await resp.json();
+    hostsCache = Array.isArray(hosts) ? hosts : [];
+    const selectedHostId = normalizeOverviewHostWidgetHostId(widget.config?.host_id);
+    select.innerHTML = hostsCache.length
+      ? hostsCache.map(host => (
+          `<option value="${escapeHtml(String(host.id))}">${escapeHtml(host.name || 'Unnamed host')}</option>`
+        )).join('')
+      : '<option value="0">No hosts configured</option>';
+    select.value = String(selectedHostId);
+    if (select.value !== String(selectedHostId) && hostsCache.length) {
+      select.value = String(hostsCache[0].id);
+    }
+    modal.classList.add('open');
+    window.setTimeout(() => select.focus(), 0);
+  } catch (err) {
+    console.error('Failed to open host widget settings', err);
+    alert('Unable to load hosts right now. Please try again.');
+  }
+}
+
+function closeOverviewHostWidgetModal() {
+  if (overviewHostWidgetState.saving) return;
+  overviewHostWidgetState = { instanceId: null, saving: false };
+  const modal = document.getElementById('overview-host-widget-modal');
+  const select = document.getElementById('overview-host-widget-select');
+  if (select) select.innerHTML = '';
+  if (modal) modal.classList.remove('open');
+}
+
+async function submitOverviewHostWidgetModal() {
+  const instanceId = overviewHostWidgetState.instanceId;
+  if (!instanceId || overviewHostWidgetState.saving) return;
+  const select = document.getElementById('overview-host-widget-select');
+  const saveBtn = document.getElementById('overview-host-widget-save-btn');
+  const selectedHostId = normalizeOverviewHostWidgetHostId(select?.value);
+  const nextLayout = cloneOverviewWidgetLayout(overviewWidgetLayout).map(item => (
+    item.instance_id === instanceId
+      ? { ...item, config: { ...(item.config || {}), host_id: selectedHostId } }
+      : item
+  ));
+  overviewHostWidgetState.saving = true;
+  if (saveBtn) saveBtn.disabled = true;
+  try {
+    await saveOverviewWidgetLayout(nextLayout);
+    overviewHostWidgetState.saving = false;
+    closeOverviewHostWidgetModal();
+  } catch (err) {
+    console.error('Failed to save host widget settings', err);
+    alert('Unable to save host selection. Please try again.');
+    overviewHostWidgetState.saving = false;
     if (saveBtn) saveBtn.disabled = false;
   }
 }
@@ -3753,6 +3861,7 @@ document.getElementById('add-modal').addEventListener('click', e => { if(e.targe
 document.getElementById('host-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeHostModal(); });
 document.getElementById('reorder-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeReorderModal(); });
 document.getElementById('overview-widget-rename-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeOverviewWidgetRenameModal(); });
+document.getElementById('overview-host-widget-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeOverviewHostWidgetModal(); });
 document.getElementById('logo-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeLogoModal(); });
 document.getElementById('debrid-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeDebridModal(); });
 document.getElementById('overview-debrid-magnet-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeOverviewDebridMagnetModal(); });
@@ -3764,6 +3873,15 @@ document.getElementById('overview-widget-rename-input').addEventListener('keydow
   } else if (event.key === 'Escape') {
     event.preventDefault();
     closeOverviewWidgetRenameModal();
+  }
+});
+document.getElementById('overview-host-widget-select').addEventListener('keydown', event => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    submitOverviewHostWidgetModal();
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    closeOverviewHostWidgetModal();
   }
 });
 document.getElementById('overview-debrid-magnet-input').addEventListener('keydown', event => {
