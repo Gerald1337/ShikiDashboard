@@ -44,10 +44,15 @@ from host_monitor import (
 )
 from system_stats import get_system_stats
 from templates import HTML
+from widgets import (
+    OVERVIEW_WIDGET_STYLES,
+    OVERVIEW_WIDGET_TYPE_METADATA,
+    render_overview_widgets,
+    sanitize_overview_widget_layout,
+)
 
 app = Flask(__name__)
 TAB_SECTIONS = {"overview", "services", "hosts", "disks", "debrid"}
-OVERVIEW_PANEL_IDS = ["host", "services", "drives", "debrid"]
 
 
 def parse_int(value, default, minimum=None, maximum=None):
@@ -116,10 +121,29 @@ def proxy_debrid_post(endpoint_path, payload, failure_message):
         return jsonify({"error": failure_message, "detail": str(exc)}), 502
     return make_debrid_proxy_response(resp)
 
+def get_saved_overview_widget_layout():
+    raw = get_app_setting("overview_panel_order")
+    parsed = None
+    if raw:
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            parsed = None
+    return sanitize_overview_widget_layout(parsed)
+
+
 def render_dashboard(initial_section="overview"):
     if initial_section not in TAB_SECTIONS:
         initial_section = "overview"
-    return render_template_string(HTML, initial_section=initial_section)
+    overview_widget_layout = get_saved_overview_widget_layout()
+    return render_template_string(
+        HTML,
+        initial_section=initial_section,
+        overview_widget_styles=OVERVIEW_WIDGET_STYLES,
+        overview_widgets=render_overview_widgets(overview_widget_layout),
+        overview_widget_layout_json=json.dumps(overview_widget_layout),
+        overview_widget_type_metadata_json=json.dumps(OVERVIEW_WIDGET_TYPE_METADATA),
+    )
 
 
 @app.route("/")
@@ -268,20 +292,6 @@ def apply_saved_drive_order(drives):
     return ordered
 
 
-def sanitize_overview_panel_order(order):
-    if not isinstance(order, list):
-        return OVERVIEW_PANEL_IDS.copy()
-    seen = set()
-    sanitized = []
-    for panel in order:
-        if panel in OVERVIEW_PANEL_IDS and panel not in seen:
-            sanitized.append(panel)
-            seen.add(panel)
-    for panel in OVERVIEW_PANEL_IDS:
-        if panel not in seen:
-            sanitized.append(panel)
-    return sanitized
-
 @app.route("/api/drives")
 def api_drives():
     drives = apply_saved_drive_order(scan_all_drives())
@@ -321,23 +331,25 @@ def api_set_drive_order():
 
 @app.route("/api/overview/order")
 def api_get_overview_order():
-    raw = get_app_setting("overview_panel_order")
-    parsed = None
-    if raw:
-        try:
-            parsed = json.loads(raw)
-        except json.JSONDecodeError:
-            parsed = None
-    order = sanitize_overview_panel_order(parsed)
-    return jsonify({"order": order})
+    layout = get_saved_overview_widget_layout()
+    return jsonify({
+        "layout": layout,
+        "order": [widget["instance_id"] for widget in layout],
+        "widgets_html": render_overview_widgets(layout),
+    })
 
 
 @app.route("/api/overview/order", methods=["POST"])
 def api_save_overview_order():
     data = request.get_json() or {}
-    order = sanitize_overview_panel_order(data.get("order"))
-    set_app_setting("overview_panel_order", json.dumps(order))
-    return jsonify({"ok": True, "order": order})
+    layout = sanitize_overview_widget_layout(data.get("layout", data.get("order")))
+    set_app_setting("overview_panel_order", json.dumps(layout))
+    return jsonify({
+        "ok": True,
+        "layout": layout,
+        "order": [widget["instance_id"] for widget in layout],
+        "widgets_html": render_overview_widgets(layout),
+    })
 
 @app.route("/api/drives/summary/cached")
 def api_drives_summary_cached():

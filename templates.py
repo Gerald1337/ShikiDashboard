@@ -201,110 +201,29 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); min-
   flex-wrap: wrap;
 }
 .panel-title { font-size: 13px; font-weight: 600; }
+.panel-title-button {
+  border: none;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+.panel-title-button:hover {
+  color: var(--accent);
+}
+.panel-title-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
 .panel-link {
   font-size: 11px; color: var(--accent); cursor: pointer; background: none; border: none;
   font-family: var(--sans); font-weight: 500;
 }
-.host-panel-status {
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: 500;
-}
-.host-stats-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-.host-stat-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--border);
-  padding: 8px 0;
-  gap: 12px;
-}
-.host-stat-row:last-child {
-  border-bottom: none;
-}
-.host-stat-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-}
-.host-stat-value-group {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  text-align: right;
-  gap: 2px;
-}
-.host-stat-value {
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1;
-}
-.host-stat-sub {
-  font-size: 11px;
-  color: var(--muted);
-}
 .panel-link:hover { text-decoration: underline; }
 .panel-body { padding: 12px 16px; }
-.overview-drive-row {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px;
-}
-.overview-drive-row:last-child { border-bottom: none; }
-.overview-drive-name { font-weight: 500; }
-.overview-drive-meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
-.overview-service-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px;
-}
-.overview-service-row:last-child { border-bottom: none; }
-.overview-debrid-status {
-  font-size: 11px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-.overview-debrid-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.overview-debrid-row {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.02);
-}
-.overview-debrid-name {
-  font-size: 13px;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.overview-debrid-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 11px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-.overview-debrid-meta-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-}
+{{ overview_widget_styles|safe }}
 .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .status-dot.up { background: var(--pass); box-shadow: 0 0 6px var(--pass); }
 .status-dot.slow { background: var(--slow); box-shadow: 0 0 6px var(--slow); }
@@ -1248,6 +1167,31 @@ canvas { display:block; width:100% !important; }
   opacity: 0.35;
   cursor: not-allowed;
 }
+.reorder-toolbar {
+  display: none;
+  align-items: end;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.reorder-toolbar.open {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.reorder-toolbar .form-group {
+  margin-bottom: 0;
+}
+.reorder-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.reorder-remove-btn {
+  color: var(--fail);
+}
+.reorder-remove-btn:hover:not(:disabled) {
+  border-color: var(--fail);
+  color: var(--fail);
+}
 
 .loading { text-align:center; padding:50px 20px; color:var(--muted); }
 .loading-spinner { width:32px; height:32px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 12px; }
@@ -1280,85 +1224,7 @@ canvas { display:block; width:100% !important; }
 
     <div class="section{% if initial_section == 'overview' %} active{% endif %}" id="section-overview">
       <div class="overview-grid">
-        <div class="overview-panel host-panel" data-panel="host" id="panel-host">
-          <div class="panel-header">
-            <div class="panel-title-group">
-              <span class="material-icons icon-inline">monitor_heart</span>
-              <span class="panel-title">Host Resource Statistics</span>
-            </div>
-          </div>
-          <div class="panel-body">
-            <div class="host-stats-list">
-              <div class="host-stat-row">
-                <div class="host-stat-label">CPU</div>
-                <div class="host-stat-value-group">
-                  <div class="host-stat-value" id="host-stat-cpu-value">—</div>
-                  <div class="host-stat-sub" id="host-stat-cpu-sub">—</div>
-                </div>
-              </div>
-              <div class="host-stat-row">
-                <div class="host-stat-label">RAM</div>
-                <div class="host-stat-value-group">
-                  <div class="host-stat-value" id="host-stat-ram-value">—</div>
-                  <div class="host-stat-sub" id="host-stat-ram-sub">—</div>
-                </div>
-              </div>
-              <div class="host-stat-row">
-                <div class="host-stat-label">Upload</div>
-                <div class="host-stat-value-group">
-                  <div class="host-stat-value" id="host-stat-upload-value">—</div>
-                  <div class="host-stat-sub" id="host-stat-upload-sub">—</div>
-                </div>
-              </div>
-              <div class="host-stat-row">
-                <div class="host-stat-label">Download</div>
-                <div class="host-stat-value-group">
-                  <div class="host-stat-value" id="host-stat-download-value">—</div>
-                  <div class="host-stat-sub" id="host-stat-download-sub">—</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="overview-panel" data-panel="services" id="panel-services">
-          <div class="panel-header">
-            <div class="panel-title-group">
-              <span class="material-icons icon-inline">public</span>
-              <span class="panel-title">Service Status</span>
-            </div>
-            <button class="panel-link" onclick="navigate('services')">View all →</button>
-          </div>
-          <div class="panel-body" id="ov-services-list">
-            <div class="loading"><div class="loading-spinner"></div></div>
-          </div>
-        </div>
-        <div class="overview-panel" data-panel="drives" id="panel-drives">
-          <div class="panel-header">
-            <div class="panel-title-group">
-              <span class="material-icons icon-inline">storage</span>
-              <span class="panel-title">Drive Status</span>
-            </div>
-            <button class="panel-link" onclick="navigate('disks')">View all →</button>
-          </div>
-          <div class="panel-body" id="ov-drives-list">
-            <div class="loading"><div class="loading-spinner"></div></div>
-          </div>
-        </div>
-        <div class="overview-panel" data-panel="debrid" id="panel-debrid">
-          <div class="panel-header">
-            <div class="panel-title-group">
-              <span class="material-icons icon-inline">download</span>
-              <span class="panel-title">Debrid Queue</span>
-            </div>
-            <button class="panel-link" onclick="navigate('debrid')">View all →</button>
-          </div>
-          <div class="panel-body">
-            <div class="overview-debrid-status" id="ov-debrid-status">Loading queue…</div>
-            <div class="overview-debrid-list" id="ov-debrid-list">
-              <div class="loading"><div class="loading-spinner"></div></div>
-            </div>
-          </div>
-        </div>
+{{ overview_widgets|safe }}
       </div>
     </div>
 
@@ -1628,10 +1494,41 @@ canvas { display:block; width:100% !important; }
         <span class="material-icons">close</span>
       </button>
     </div>
+    <div class="reorder-toolbar" id="reorder-toolbar">
+      <div class="form-group">
+        <label class="form-label" for="reorder-widget-type">Add Widget</label>
+        <select class="form-select" id="reorder-widget-type"></select>
+      </div>
+      <div class="reorder-toolbar-actions">
+        <button class="btn-primary" type="button" onclick="addOverviewWidget()">Add</button>
+      </div>
+    </div>
     <ul class="reorder-list" id="reorder-list"></ul>
     <div class="modal-actions">
       <button class="btn-secondary" type="button" onclick="closeReorderModal()">Cancel</button>
-      <button class="btn-primary" type="button" onclick="saveReorderChanges()">Save Order</button>
+      <button class="btn-primary" type="button" id="reorder-save-btn" onclick="saveReorderChanges()">Save Order</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="overview-widget-rename-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h2>Rename Widget</h2>
+        <div class="modal-subtitle">Update the title shown on the overview screen for this widget instance.</div>
+      </div>
+      <button class="icon-btn modal-close-btn" type="button" onclick="closeOverviewWidgetRenameModal()" title="Close">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="overview-widget-rename-input">Widget Name</label>
+      <input class="form-input" id="overview-widget-rename-input" type="text" maxlength="80" placeholder="Widget title"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" type="button" onclick="closeOverviewWidgetRenameModal()">Cancel</button>
+      <button class="btn-primary" type="button" id="overview-widget-rename-save-btn" onclick="submitOverviewWidgetRename()">Save Name</button>
     </div>
   </div>
 </div>
@@ -1747,6 +1644,13 @@ let logoRenderQueued = false;
 let debridConfig = { ip: '', username: '', password: '', updated_at: null };
 let debridQueueTimer = null;
 let debridQueueSnapshot = [];
+let latestHostStats = null;
+let latestOverviewDebridStatus = 'Loading queue…';
+let hasLoadedOverviewDriveData = false;
+let hasLoadedOverviewServiceData = false;
+let hasLoadedHostStats = false;
+let hasLoadedOverviewDebrid = false;
+let overviewWidgetRenameState = { instanceId: null, saving: false };
 let debridQueueActionState = { action: '', torrentId: '', rawTorrentId: null, torrentName: '' };
 let debridQueueActionSubmitting = false;
 let magnetSubmissionInProgress = false;
@@ -2356,9 +2260,11 @@ function stopHostStatsPoll() {
 }
 
 function updateHostStats(stats) {
-  const cpuEl = document.getElementById('host-stat-cpu-value');
-  if (!cpuEl) return;
   stats = stats || {};
+  latestHostStats = stats;
+  hasLoadedHostStats = true;
+  const panels = Array.from(document.querySelectorAll('.overview-panel[data-widget-type="host_resources"]'));
+  if (!panels.length) return;
   const available = Boolean(stats.available);
   const statusLabel = available ? 'Live data' : (stats.error || 'Stats unavailable');
 
@@ -2375,22 +2281,24 @@ function updateHostStats(stats) {
   const uploadSub = Number.isFinite(stats.upload_bps) ? '' : statusLabel;
   const downloadSub = Number.isFinite(stats.download_bps) ? '' : statusLabel;
 
-  const cpuValueEl = document.getElementById('host-stat-cpu-value');
-  const ramValueEl = document.getElementById('host-stat-ram-value');
-  const uploadValueEl = document.getElementById('host-stat-upload-value');
-  const downloadValueEl = document.getElementById('host-stat-download-value');
-  if (cpuValueEl) cpuValueEl.textContent = cpuValue;
-  if (ramValueEl) ramValueEl.textContent = ramValue;
-  if (uploadValueEl) uploadValueEl.textContent = uploadValue;
-  if (downloadValueEl) downloadValueEl.textContent = downloadValue;
-  const cpuSubEl = document.getElementById('host-stat-cpu-sub');
-  const ramSubEl = document.getElementById('host-stat-ram-sub');
-  if (cpuSubEl) cpuSubEl.textContent = available ? '' : statusLabel;
-  if (ramSubEl) ramSubEl.textContent = ramSub;
-  const uploadSubEl = document.getElementById('host-stat-upload-sub');
-  const downloadSubEl = document.getElementById('host-stat-download-sub');
-  if (uploadSubEl) uploadSubEl.textContent = uploadSub;
-  if (downloadSubEl) downloadSubEl.textContent = downloadSub;
+  panels.forEach(panel => {
+    const cpuValueEl = panel.querySelector('[data-role="cpu-value"]');
+    const ramValueEl = panel.querySelector('[data-role="ram-value"]');
+    const uploadValueEl = panel.querySelector('[data-role="upload-value"]');
+    const downloadValueEl = panel.querySelector('[data-role="download-value"]');
+    if (cpuValueEl) cpuValueEl.textContent = cpuValue;
+    if (ramValueEl) ramValueEl.textContent = ramValue;
+    if (uploadValueEl) uploadValueEl.textContent = uploadValue;
+    if (downloadValueEl) downloadValueEl.textContent = downloadValue;
+    const cpuSubEl = panel.querySelector('[data-role="cpu-sub"]');
+    const ramSubEl = panel.querySelector('[data-role="ram-sub"]');
+    if (cpuSubEl) cpuSubEl.textContent = available ? '' : statusLabel;
+    if (ramSubEl) ramSubEl.textContent = ramSub;
+    const uploadSubEl = panel.querySelector('[data-role="upload-sub"]');
+    const downloadSubEl = panel.querySelector('[data-role="download-sub"]');
+    if (uploadSubEl) uploadSubEl.textContent = uploadSub;
+    if (downloadSubEl) downloadSubEl.textContent = downloadSub;
+  });
 }
 function setSpinning(on) {
   const btn = document.getElementById('disks-refresh-btn');
@@ -2483,6 +2391,8 @@ async function loadOverview(useCache = true) {
     servicesCache = services;
 
     await loadNicknames();
+    hasLoadedOverviewDriveData = true;
+    hasLoadedOverviewServiceData = true;
     renderOverviewDrives(drives);
     renderOverviewServices(services);
     setUpdated(dSum.last_scanned);
@@ -2492,55 +2402,66 @@ async function loadOverview(useCache = true) {
 
 function renderOverviewDrives(drives) {
   updateDiskTabNotification(drives);
-  const el = document.getElementById('ov-drives-list');
-  if (!drives.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px">No drives found.</div>'; return; }
-  el.innerHTML = drives.map(d => {
-    const nick = nicknames[d.device] || d.model || 'Unknown';
-    const temp = d.temperature != null ? `${d.temperature}°C` : '—';
-    const tc = tempClass(d.temperature);
-    return `<div class="overview-drive-row">
-      <div>
-        <div class="overview-drive-name">${nick}</div>
-        <div class="overview-drive-meta">${d.device} · ${formatGB(d.capacity_gb)}</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <span class="${tc}" style="font-weight:600;font-size:13px">${temp}</span>
-        <span class="health-badge ${d.health}">${d.health}</span>
-      </div>
-    </div>`;
-  }).join('');
+  const slots = Array.from(document.querySelectorAll('[data-widget-slot="drive_status"]'));
+  slots.forEach(slot => {
+    const widget = getOverviewWidgetForElement(slot);
+    const widgetDrives = applyOverviewWidgetLimit(drives, widget);
+    if (!widgetDrives.length) {
+      slot.innerHTML = '<div style="color:var(--muted);font-size:13px">No drives found.</div>';
+      return;
+    }
+    slot.innerHTML = widgetDrives.map(d => {
+      const nick = nicknames[d.device] || d.model || 'Unknown';
+      const temp = d.temperature != null ? `${d.temperature}°C` : '—';
+      const tc = tempClass(d.temperature);
+      return `<div class="overview-drive-row">
+        <div>
+          <div class="overview-drive-name">${nick}</div>
+          <div class="overview-drive-meta">${d.device} · ${formatGB(d.capacity_gb)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="${tc}" style="font-weight:600;font-size:13px">${temp}</span>
+          <span class="health-badge ${d.health}">${d.health}</span>
+        </div>
+      </div>`;
+    }).join('');
+  });
 }
 
 function renderOverviewServices(services) {
-  const el = document.getElementById('ov-services-list');
-  if (!services.length) {
-    el.innerHTML = '<div style="color:var(--muted);font-size:13px">No services added. <button class="panel-link" onclick="navigate(\'services\')">Add one →</button></div>';
-    return;
-  }
-  el.innerHTML = services.map(s => {
-    const st = s.latest ? s.latest.status : 'unknown';
-    const vc = svcVisualClass(st, s.latest?.response_ms);
-    const ts = s.latest?.timestamp || '';
-    const statusLabel = st === 'unknown' ? '—' : st.toUpperCase();
-    const badgeLabel = `<span class="badge-icon material-icons icon-inline">public</span>${statusLabel}`;
-    const hasExternal = !!s.url;
-    const hasLocal = !!s.local_url;
-    const lst = hasLocal ? (s.latest_local ? s.latest_local.status : 'unknown') : null;
-    const localStatusLabel = lst === 'unknown' ? '—' : lst.toUpperCase();
-    const badges = [];
-    if (hasExternal) badges.push(`<span class="svc-badge ext-badge ${vc}" title="External">${badgeLabel}</span>`);
-    if (hasLocal) badges.push(`<span class="svc-badge local-badge ${lst}" title="Local"><span class="badge-icon material-icons icon-inline">home</span>${localStatusLabel}</span>`);
-    return `<div class="overview-service-row">
-      <div class="status-dot ${vc}"></div>
-      <div style="flex:1">
-        <div style="font-weight:500;font-size:13px">${s.name}</div>
-        <div style="font-size:11px;color:var(--muted)" data-last-check-ts="${ts}">${timeAgo(ts)}</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px">
-        ${badges.join('')}
-      </div>
-    </div>`;
-  }).join('');
+  const slots = Array.from(document.querySelectorAll('[data-widget-slot="service_status"]'));
+  slots.forEach(slot => {
+    const widget = getOverviewWidgetForElement(slot);
+    const widgetServices = applyOverviewWidgetLimit(services, widget);
+    if (!widgetServices.length) {
+      slot.innerHTML = '<div style="color:var(--muted);font-size:13px">No services added. <button class="panel-link" onclick="navigate(\'services\')">Add one →</button></div>';
+      return;
+    }
+    slot.innerHTML = widgetServices.map(s => {
+      const st = s.latest ? s.latest.status : 'unknown';
+      const vc = svcVisualClass(st, s.latest?.response_ms);
+      const ts = s.latest?.timestamp || '';
+      const statusLabel = st === 'unknown' ? '—' : st.toUpperCase();
+      const badgeLabel = `<span class="badge-icon material-icons icon-inline">public</span>${statusLabel}`;
+      const hasExternal = !!s.url;
+      const hasLocal = !!s.local_url;
+      const lst = hasLocal ? (s.latest_local ? s.latest_local.status : 'unknown') : null;
+      const localStatusLabel = lst === 'unknown' ? '—' : lst.toUpperCase();
+      const badges = [];
+      if (hasExternal) badges.push(`<span class="svc-badge ext-badge ${vc}" title="External">${badgeLabel}</span>`);
+      if (hasLocal) badges.push(`<span class="svc-badge local-badge ${lst}" title="Local"><span class="badge-icon material-icons icon-inline">home</span>${localStatusLabel}</span>`);
+      return `<div class="overview-service-row">
+        <div class="status-dot ${vc}"></div>
+        <div style="flex:1">
+          <div style="font-weight:500;font-size:13px">${s.name}</div>
+          <div style="font-size:11px;color:var(--muted)" data-last-check-ts="${ts}">${timeAgo(ts)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          ${badges.join('')}
+        </div>
+      </div>`;
+    }).join('');
+  });
 }
 
 async function loadNicknames() {
@@ -2646,72 +2567,172 @@ function renderDrivesGrid(drives) {
   container.innerHTML = `<div class="drives-grid">${drives.map(renderDrive).join('')}</div>`;
 }
 
-const DEFAULT_OVERVIEW_PANEL_ORDER = ['host', 'services', 'drives', 'debrid'];
-const OVERVIEW_PANEL_METADATA = {
-  host: { label: 'Host Resource Statistics', meta: 'CPU, RAM, and network activity snapshot' },
-  services: { label: 'Service Status', meta: 'External and local health summary' },
-  drives: { label: 'Drive Status', meta: 'Temperature and health overview' },
-  debrid: { label: 'Debrid Queue', meta: 'Active torrent queue' },
+const DEFAULT_OVERVIEW_WIDGET_LAYOUT = {{ overview_widget_layout_json|safe }};
+const OVERVIEW_WIDGET_TYPE_METADATA = {{ overview_widget_type_metadata_json|safe }};
+const LEGACY_OVERVIEW_WIDGET_TYPE_MAP = {
+  host: 'host_resources',
+  services: 'service_status',
+  drives: 'drive_status',
+  debrid: 'debrid_queue',
 };
-let overviewPanelOrder = DEFAULT_OVERVIEW_PANEL_ORDER.slice();
+let overviewWidgetLayout = sanitizeOverviewWidgetLayout(DEFAULT_OVERVIEW_WIDGET_LAYOUT);
 
-function sanitizeOverviewPanelOrder(order) {
-  if (!Array.isArray(order)) return DEFAULT_OVERVIEW_PANEL_ORDER.slice();
-  const seen = new Set();
+function cloneOverviewWidgetInstance(widget) {
+  return {
+    instance_id: widget.instance_id,
+    type: widget.type,
+    title: widget.title,
+    config: widget.config && typeof widget.config === 'object' && !Array.isArray(widget.config) ? { ...widget.config } : {},
+  };
+}
+
+function cloneOverviewWidgetLayout(layout) {
+  return Array.isArray(layout) ? layout.map(cloneOverviewWidgetInstance) : [];
+}
+
+function sanitizeOverviewWidgetInstanceId(value) {
+  if (typeof value !== 'string') return '';
+  const normalized = value.trim();
+  return /^[A-Za-z0-9_-]+$/.test(normalized) ? normalized : '';
+}
+
+function sanitizeOverviewWidgetLayout(layout) {
+  const defaultLayout = cloneOverviewWidgetLayout(DEFAULT_OVERVIEW_WIDGET_LAYOUT);
+  const defaultByInstance = {};
+  const defaultByType = {};
+  defaultLayout.forEach(widget => {
+    defaultByInstance[widget.instance_id] = widget;
+    if (!defaultByType[widget.type]) defaultByType[widget.type] = widget;
+  });
+
+  if (!Array.isArray(layout)) return defaultLayout;
+  if (!layout.length) return [];
+
+  if (layout.length && layout.every(item => typeof item === 'string')) {
+    const sanitized = [];
+    const seen = new Set();
+    layout.forEach(item => {
+      let widget = defaultByInstance[item];
+      if (!widget && LEGACY_OVERVIEW_WIDGET_TYPE_MAP[item]) {
+        widget = defaultByType[LEGACY_OVERVIEW_WIDGET_TYPE_MAP[item]];
+      }
+      if (widget && !seen.has(widget.instance_id)) {
+        sanitized.push(cloneOverviewWidgetInstance(widget));
+        seen.add(widget.instance_id);
+      }
+    });
+    defaultLayout.forEach(widget => {
+      if (!seen.has(widget.instance_id)) {
+        sanitized.push(cloneOverviewWidgetInstance(widget));
+      }
+    });
+    return sanitized.length ? sanitized : defaultLayout;
+  }
+
   const sanitized = [];
-  for (const id of order) {
-    if (OVERVIEW_PANEL_METADATA[id] && !seen.has(id)) {
-      seen.add(id);
-      sanitized.push(id);
-    }
-  }
-  for (const id of DEFAULT_OVERVIEW_PANEL_ORDER) {
-    if (!seen.has(id)) {
-      sanitized.push(id);
-      seen.add(id);
-    }
-  }
+  const seen = new Set();
+  layout.forEach(item => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return;
+    const type = item.type;
+    if (!OVERVIEW_WIDGET_TYPE_METADATA[type]) return;
+    const instanceId = sanitizeOverviewWidgetInstanceId(item.instance_id);
+    if (!instanceId || seen.has(instanceId)) return;
+    const defaultWidget = defaultByType[type];
+    const title = typeof item.title === 'string' && item.title.trim()
+      ? item.title.trim()
+      : (defaultWidget?.title || OVERVIEW_WIDGET_TYPE_METADATA[type].label || type);
+    sanitized.push({
+      instance_id: instanceId,
+      type,
+      title,
+      config: item.config && typeof item.config === 'object' && !Array.isArray(item.config) ? { ...item.config } : {},
+    });
+    seen.add(instanceId);
+  });
+
   return sanitized;
 }
 
-function applyOverviewPanelOrder(order = overviewPanelOrder) {
+function applyOverviewWidgetLayout(layout = overviewWidgetLayout) {
   const grid = document.querySelector('.overview-grid');
   if (!grid) return;
-  const panels = Array.from(grid.querySelectorAll('.overview-panel[data-panel]'));
+  const panels = Array.from(grid.querySelectorAll('.overview-panel[data-widget-instance]'));
   const panelMap = {};
-  panels.forEach(panel => { panelMap[panel.dataset.panel] = panel; });
-  order.forEach(id => {
-    const panel = panelMap[id];
+  panels.forEach(panel => { panelMap[panel.dataset.widgetInstance] = panel; });
+  layout.forEach(widget => {
+    const panel = panelMap[widget.instance_id];
     if (panel) {
       grid.append(panel);
-      delete panelMap[id];
+      delete panelMap[widget.instance_id];
     }
   });
-  Object.values(panelMap).forEach(panel => grid.append(panel));
+  Object.values(panelMap).forEach(panel => panel.remove());
 }
 
-async function loadOverviewPanelOrder() {
+function refreshOverviewWidgetsFromCache() {
+  if (hasLoadedHostStats) updateHostStats(latestHostStats);
+  if (hasLoadedOverviewDriveData) renderOverviewDrives(drivesCache);
+  if (hasLoadedOverviewServiceData) renderOverviewServices(servicesCache);
+  if (hasLoadedOverviewDebrid) renderOverviewDebridQueue(latestOverviewDebridStatus, debridQueueSnapshot);
+}
+
+function replaceOverviewWidgetMarkup(widgetsHtml) {
+  const grid = document.querySelector('.overview-grid');
+  if (!grid || typeof widgetsHtml !== 'string') return;
+  grid.innerHTML = widgetsHtml;
+  refreshOverviewWidgetsFromCache();
+}
+
+async function loadOverviewWidgetLayout() {
   try {
     const resp = await fetch('/api/overview/order');
     if (!resp.ok) throw new Error('Failed to load overview layout');
     const payload = await resp.json();
-    overviewPanelOrder = sanitizeOverviewPanelOrder(payload.order);
+    overviewWidgetLayout = sanitizeOverviewWidgetLayout(payload.layout ?? payload.order);
+    if (typeof payload.widgets_html === 'string') replaceOverviewWidgetMarkup(payload.widgets_html);
   } catch (err) {
-    overviewPanelOrder = DEFAULT_OVERVIEW_PANEL_ORDER.slice();
+    overviewWidgetLayout = sanitizeOverviewWidgetLayout(DEFAULT_OVERVIEW_WIDGET_LAYOUT);
   }
-  applyOverviewPanelOrder();
+  applyOverviewWidgetLayout();
 }
 
-async function saveOverviewPanelOrder(order) {
+async function saveOverviewWidgetLayout(layout) {
   const resp = await fetch('/api/overview/order', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({order}),
+    body: JSON.stringify({layout}),
   });
   if (!resp.ok) {
     const payload = await resp.json().catch(() => null);
     throw new Error(payload?.error || resp.statusText || 'Unknown error');
   }
+  const payload = await resp.json().catch(() => null);
+  overviewWidgetLayout = sanitizeOverviewWidgetLayout(payload?.layout ?? layout);
+  if (typeof payload?.widgets_html === 'string') replaceOverviewWidgetMarkup(payload.widgets_html);
+  return payload;
+}
+
+function getOverviewWidgetInstance(instanceId) {
+  return overviewWidgetLayout.find(widget => widget.instance_id === instanceId)
+    || DEFAULT_OVERVIEW_WIDGET_LAYOUT.find(widget => widget.instance_id === instanceId)
+    || null;
+}
+
+function getOverviewWidgetForElement(element) {
+  const panel = element?.closest('.overview-panel[data-widget-instance]');
+  if (!panel) return null;
+  return getOverviewWidgetInstance(panel.dataset.widgetInstance);
+}
+
+function applyOverviewWidgetLimit(items, widget, fallbackLimit = null) {
+  let nextItems = Array.isArray(items) ? items.slice() : [];
+  const limit = Number(widget?.config?.limit);
+  if (Number.isFinite(limit) && limit > 0) {
+    nextItems = nextItems.slice(0, Math.floor(limit));
+  } else if (Number.isFinite(fallbackLimit) && fallbackLimit > 0) {
+    nextItems = nextItems.slice(0, Math.floor(fallbackLimit));
+  }
+  return nextItems;
 }
 
 let reorderState = { type: null, items: [] };
@@ -2735,21 +2756,24 @@ function openReorderModal(type) {
   } else if (type === 'services') {
     items = (servicesCache || []).slice();
   } else if (type === 'overview') {
-    const order = overviewPanelOrder.length ? overviewPanelOrder : DEFAULT_OVERVIEW_PANEL_ORDER;
-    items = order.map(id => ({
-      id,
-      label: OVERVIEW_PANEL_METADATA[id]?.label || id,
-      meta: OVERVIEW_PANEL_METADATA[id]?.meta || '',
+    const layout = overviewWidgetLayout.length ? overviewWidgetLayout : DEFAULT_OVERVIEW_WIDGET_LAYOUT;
+    items = layout.map(widget => ({
+      id: widget.instance_id,
+      type: widget.type,
+      title: widget.title || OVERVIEW_WIDGET_TYPE_METADATA[widget.type]?.label || widget.type,
+      meta: OVERVIEW_WIDGET_TYPE_METADATA[widget.type]?.meta || '',
+      config: widget.config && typeof widget.config === 'object' && !Array.isArray(widget.config) ? { ...widget.config } : {},
     }));
   }
   reorderState.items = items;
   const titleEl = document.getElementById('reorder-modal-title');
   const subtitleEl = document.getElementById('reorder-modal-subtitle');
+  const saveBtn = document.getElementById('reorder-save-btn');
   if (titleEl) {
     if (type === 'drives') titleEl.textContent = 'Reorder Drives';
     else if (type === 'hosts') titleEl.textContent = 'Reorder Hosts';
     else if (type === 'services') titleEl.textContent = 'Reorder Services';
-    else titleEl.textContent = 'Reorder Overview Panels';
+    else titleEl.textContent = 'Edit Overview Widgets';
   }
   if (subtitleEl) {
     if (type === 'drives') {
@@ -2759,11 +2783,134 @@ function openReorderModal(type) {
     } else if (type === 'services') {
       subtitleEl.textContent = 'Service order is saved to the server and affects the Services page.';
     } else {
-      subtitleEl.textContent = 'Rearrange which sections appear on the overview screen and save your preferred layout.';
+      subtitleEl.textContent = 'Add, remove, and rearrange overview widgets, then save your preferred layout.';
     }
   }
+  if (saveBtn) saveBtn.textContent = type === 'overview' ? 'Save Layout' : 'Save Order';
+  syncReorderToolbar();
   renderReorderList();
   document.getElementById('reorder-modal')?.classList.add('open');
+}
+
+function syncReorderToolbar() {
+  const toolbar = document.getElementById('reorder-toolbar');
+  const select = document.getElementById('reorder-widget-type');
+  if (!toolbar || !select) return;
+  const isOverview = reorderState.type === 'overview';
+  toolbar.classList.toggle('open', isOverview);
+  if (!isOverview) {
+    select.innerHTML = '';
+    return;
+  }
+  const options = Object.entries(OVERVIEW_WIDGET_TYPE_METADATA).map(([type, meta]) => (
+    `<option value="${escapeHtml(type)}">${escapeHtml(meta.label || type)}</option>`
+  ));
+  select.innerHTML = options.join('');
+}
+
+function normalizeOverviewWidgetTypeLabel(type) {
+  return OVERVIEW_WIDGET_TYPE_METADATA[type]?.label || type || 'Widget';
+}
+
+function makeOverviewWidgetInstanceId(type) {
+  const base = String(type || 'widget').replace(/[^A-Za-z0-9_-]+/g, '_') || 'widget';
+  let candidate = `${base}_${Date.now().toString(36)}`;
+  let suffix = 1;
+  const existing = new Set((reorderState.items || []).map(item => item.id));
+  while (existing.has(candidate)) {
+    candidate = `${base}_${Date.now().toString(36)}_${suffix}`;
+    suffix += 1;
+  }
+  return candidate;
+}
+
+function makeOverviewWidgetTitle(type) {
+  const base = normalizeOverviewWidgetTypeLabel(type);
+  const existingTitles = new Set((reorderState.items || []).map(item => item.title));
+  if (!existingTitles.has(base)) return base;
+  let index = 2;
+  while (existingTitles.has(`${base} ${index}`)) {
+    index += 1;
+  }
+  return `${base} ${index}`;
+}
+
+function addOverviewWidget() {
+  if (reorderState.type !== 'overview') return;
+  const select = document.getElementById('reorder-widget-type');
+  const type = select?.value;
+  if (!type || !OVERVIEW_WIDGET_TYPE_METADATA[type]) return;
+  reorderState.items.push({
+    id: makeOverviewWidgetInstanceId(type),
+    type,
+    title: makeOverviewWidgetTitle(type),
+    meta: OVERVIEW_WIDGET_TYPE_METADATA[type]?.meta || '',
+    config: {},
+  });
+  renderReorderList();
+}
+
+function removeOverviewWidget(index) {
+  if (reorderState.type !== 'overview') return;
+  if (index < 0 || index >= reorderState.items.length) return;
+  reorderState.items.splice(index, 1);
+  renderReorderList();
+}
+
+function renameOverviewWidget(instanceId) {
+  const widget = getOverviewWidgetInstance(instanceId);
+  if (!widget) return;
+  overviewWidgetRenameState = { instanceId, saving: false };
+  const defaultTitle = normalizeOverviewWidgetTypeLabel(widget.type);
+  const input = document.getElementById('overview-widget-rename-input');
+  const saveBtn = document.getElementById('overview-widget-rename-save-btn');
+  if (input) {
+    input.value = widget.title || defaultTitle;
+    input.placeholder = defaultTitle;
+  }
+  if (saveBtn) saveBtn.disabled = false;
+  document.getElementById('overview-widget-rename-modal')?.classList.add('open');
+  window.setTimeout(() => {
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  }, 0);
+}
+
+function closeOverviewWidgetRenameModal() {
+  if (overviewWidgetRenameState.saving) return;
+  overviewWidgetRenameState = { instanceId: null, saving: false };
+  const input = document.getElementById('overview-widget-rename-input');
+  if (input) input.value = '';
+  document.getElementById('overview-widget-rename-modal')?.classList.remove('open');
+}
+
+async function submitOverviewWidgetRename() {
+  const instanceId = overviewWidgetRenameState.instanceId;
+  const widget = getOverviewWidgetInstance(instanceId);
+  if (!widget || overviewWidgetRenameState.saving) return;
+  const defaultTitle = normalizeOverviewWidgetTypeLabel(widget.type);
+  const input = document.getElementById('overview-widget-rename-input');
+  const saveBtn = document.getElementById('overview-widget-rename-save-btn');
+  const normalizedTitle = ((input?.value || '').trim() || defaultTitle);
+  const nextLayout = cloneOverviewWidgetLayout(overviewWidgetLayout).map(item => (
+    item.instance_id === instanceId
+      ? { ...item, title: normalizedTitle }
+      : item
+  ));
+  overviewWidgetRenameState.saving = true;
+  if (saveBtn) saveBtn.disabled = true;
+  try {
+    await saveOverviewWidgetLayout(nextLayout);
+    overviewWidgetRenameState.saving = false;
+    closeOverviewWidgetRenameModal();
+  } catch (err) {
+    console.error('Failed to rename overview widget', err);
+    alert('Unable to rename overview widget. Please try again.');
+    overviewWidgetRenameState.saving = false;
+    if (saveBtn) saveBtn.disabled = false;
+  }
 }
 
 function renderReorderList() {
@@ -2785,18 +2932,22 @@ function renderReorderList() {
       label = escapeHtml(item.name || 'Unnamed host');
       meta = escapeHtml(`${item.host || ''}:${item.port || 8765}`);
     } else if (type === 'overview') {
-      label = escapeHtml(item.label || 'Overview panel');
-      meta = escapeHtml(item.meta || 'Overview section');
+      label = escapeHtml(item.title || 'Overview widget');
+      meta = escapeHtml(item.meta || OVERVIEW_WIDGET_TYPE_METADATA[item.type]?.label || 'Overview widget');
     } else {
       label = escapeHtml(item.name || 'Unnamed service');
       meta = escapeHtml(item.url || item.local_url || 'Local monitor');
     }
+    const removeButton = type === 'overview'
+      ? `<button type="button" class="reorder-remove-btn" onclick="removeOverviewWidget(${idx})" aria-label="Remove widget" title="Remove widget"><span class="material-icons">delete</span></button>`
+      : '';
     return `<li class="reorder-item">
       <div>
         <div class="reorder-label">${label}</div>
         <div class="reorder-meta">${meta}</div>
       </div>
       <div class="reorder-controls">
+        ${removeButton}
         <button type="button" onclick="moveReorderItem(${idx}, -1)" ${idx === 0 ? 'disabled' : ''}><span class="material-icons">arrow_upward</span></button>
         <button type="button" onclick="moveReorderItem(${idx}, 1)" ${idx === items.length - 1 ? 'disabled' : ''}><span class="material-icons">arrow_downward</span></button>
       </div>
@@ -2848,11 +2999,16 @@ async function saveReorderChanges() {
     if (order.length) await saveHostOrder(order);
     await loadHosts();
   } else if (reorderState.type === 'overview') {
-    const order = sanitizeOverviewPanelOrder(reorderState.items.map(item => item.id));
-    overviewPanelOrder = order.slice();
-    applyOverviewPanelOrder();
+    const layout = sanitizeOverviewWidgetLayout(reorderState.items.map(item => ({
+      instance_id: item.id,
+      type: item.type,
+      title: item.title,
+      config: item.config,
+    })));
+    overviewWidgetLayout = cloneOverviewWidgetLayout(layout);
+    applyOverviewWidgetLayout();
     try {
-      await saveOverviewPanelOrder(order);
+      await saveOverviewWidgetLayout(layout);
     } catch (err) {
       console.error('Failed to save overview panel order', err);
       alert('Unable to save overview panel order. Please try again.');
@@ -3692,9 +3848,19 @@ function closeAddModal() {
 document.getElementById('add-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeAddModal(); });
 document.getElementById('host-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeHostModal(); });
 document.getElementById('reorder-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeReorderModal(); });
+document.getElementById('overview-widget-rename-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeOverviewWidgetRenameModal(); });
 document.getElementById('logo-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeLogoModal(); });
 document.getElementById('debrid-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeDebridModal(); });
 document.getElementById('debrid-queue-action-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeDebridQueueActionModal(); });
+document.getElementById('overview-widget-rename-input').addEventListener('keydown', event => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    submitOverviewWidgetRename();
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    closeOverviewWidgetRenameModal();
+  }
+});
 
 async function submitAddService() {
   const name = document.getElementById('svc-name').value.trim();
@@ -3928,47 +4094,53 @@ function formatOverviewQueueLabel(totalItems, completedItems = 0) {
 }
 
 function renderOverviewDebridQueue(status, items = []) {
-  const statusEl = document.getElementById('ov-debrid-status');
-  const listEl = document.getElementById('ov-debrid-list');
-  if (statusEl) statusEl.textContent = status || 'Queue unavailable';
-  if (!listEl) return;
+  latestOverviewDebridStatus = status || 'Queue unavailable';
+  hasLoadedOverviewDebrid = true;
+  const panels = Array.from(document.querySelectorAll('.overview-panel[data-widget-type="debrid_queue"]'));
+  panels.forEach(panel => {
+    const widget = getOverviewWidgetForElement(panel);
+    const statusEl = panel.querySelector('[data-role="overview-debrid-status"]');
+    const listEl = panel.querySelector('[data-widget-slot="debrid_queue"]');
+    if (statusEl) statusEl.textContent = status || 'Queue unavailable';
+    if (!listEl) return;
 
-  if (!debridConfig.ip || !debridConfig.username) {
-    listEl.innerHTML = '<div class="debrid-queue-empty">Configure Debrid to show the queue overview.</div>';
-    return;
-  }
-  if (!items.length) {
-    listEl.innerHTML = '<div class="debrid-queue-empty">No torrents currently queued.</div>';
-    return;
-  }
+    if (!debridConfig.ip || !debridConfig.username) {
+      listEl.innerHTML = '<div class="debrid-queue-empty">Configure Debrid to show the queue overview.</div>';
+      return;
+    }
+    if (!items.length) {
+      listEl.innerHTML = '<div class="debrid-queue-empty">No torrents currently queued.</div>';
+      return;
+    }
 
-  const previewItems = sortOverviewQueueItems(items).slice(0, 3);
-  listEl.innerHTML = previewItems.map(item => {
-    const percent = Number.isFinite(Number(item.downloadedPercent))
-      ? Math.max(0, Math.min(100, Number(item.downloadedPercent)))
-      : null;
-    const speed = Number.isFinite(Number(item.currentDownloadSpeedBytesPerSecond))
-      ? formatBytesPerSecond(Number(item.currentDownloadSpeedBytesPerSecond))
-      : '—';
-    const progressWidth = percent != null ? `${percent}%` : '0%';
-    const percentLabel = percent != null ? `${percent.toFixed(1)}%` : '—';
-    const statusLabel = (item.status || '').trim() || 'Status';
-    const statusClass = queueStatusClass(statusLabel);
-    const name = item.name || 'Unnamed torrent';
-    return `<div class="overview-debrid-row">
-      <div class="overview-debrid-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
-      <div class="overview-debrid-meta">
-        <div class="debrid-queue-item-status-pill ${statusClass}" title="${escapeHtml(statusLabel)}">${escapeHtml(statusLabel)}</div>
-        <div class="overview-debrid-meta-right">
-          <span>${percentLabel}</span>
-          <span>${speed}</span>
+    const previewItems = applyOverviewWidgetLimit(sortOverviewQueueItems(items), widget, 3);
+    listEl.innerHTML = previewItems.map(item => {
+      const percent = Number.isFinite(Number(item.downloadedPercent))
+        ? Math.max(0, Math.min(100, Number(item.downloadedPercent)))
+        : null;
+      const speed = Number.isFinite(Number(item.currentDownloadSpeedBytesPerSecond))
+        ? formatBytesPerSecond(Number(item.currentDownloadSpeedBytesPerSecond))
+        : '—';
+      const progressWidth = percent != null ? `${percent}%` : '0%';
+      const percentLabel = percent != null ? `${percent.toFixed(1)}%` : '—';
+      const statusLabel = (item.status || '').trim() || 'Status';
+      const statusClass = queueStatusClass(statusLabel);
+      const name = item.name || 'Unnamed torrent';
+      return `<div class="overview-debrid-row">
+        <div class="overview-debrid-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+        <div class="overview-debrid-meta">
+          <div class="debrid-queue-item-status-pill ${statusClass}" title="${escapeHtml(statusLabel)}">${escapeHtml(statusLabel)}</div>
+          <div class="overview-debrid-meta-right">
+            <span>${percentLabel}</span>
+            <span>${speed}</span>
+          </div>
         </div>
-      </div>
-      <div class="debrid-progress">
-        <div class="debrid-progress-fill" style="width:${progressWidth}"></div>
-      </div>
-    </div>`;
-  }).join('');
+        <div class="debrid-progress">
+          <div class="debrid-progress-fill" style="width:${progressWidth}"></div>
+        </div>
+      </div>`;
+    }).join('');
+  });
 }
 
 function setDebridMagnetStatus(message, tone) {
@@ -4292,7 +4464,7 @@ function renderDebridQueueList(items) {
 
 // Load cached SMART data from the database on page load.
 fetchLogoConfig().catch(err => console.error('Failed to load app logo', err));
-loadOverviewPanelOrder();
+loadOverviewWidgetLayout();
 setupDebridMagnetInput();
 setupDebridQueueActions();
 applyDebridQueueVisibility();
