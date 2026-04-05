@@ -2161,6 +2161,18 @@ function timeAgo(ts) {
   if (diff < 86400) return Math.floor(diff/3600)+'h ago';
   return Math.floor(diff/86400)+'d ago';
 }
+function formatDateTime(ts) {
+  if (!ts) return 'Unknown time';
+  const date = new Date(ts);
+  if (Number.isNaN(date.getTime())) return 'Unknown time';
+  return date.toLocaleString([], {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
 function formatMs(ms) {
   if (ms == null) return '—';
   if (ms >= 60000) return (ms/1000).toFixed(0) + 's';
@@ -2265,15 +2277,59 @@ function formatEmbySessionItem(item) {
   return `${item?.name || 'Untitled'}${year}`;
 }
 
+function getEmbyBackupDisplay(backup) {
+  if (!backup || typeof backup !== 'object') {
+    return { text: 'Last backup: unavailable', title: 'Backup status unavailable', isStale: true };
+  }
+  if (backup.error) {
+    return {
+      text: `Last backup: ${backup.error}`,
+      title: backup.detail || backup.error,
+      isStale: backup.is_stale !== false,
+    };
+  }
+
+  const completedAt = backup.last_completed_at || '';
+  const lastResultTime = backup.last_result_end_time || '';
+  const status = String(backup.status || '').trim();
+  const taskName = backup.task_name || 'Backup';
+  if (status === 'Completed' && completedAt) {
+    return {
+      text: `Last backup: ${timeAgo(completedAt)}`,
+      title: `${taskName} completed ${formatDateTime(completedAt)}`,
+      isStale: backup.is_stale === true,
+    };
+  }
+  if (status) {
+    const statusLabel = status.toLowerCase();
+    return {
+      text: lastResultTime ? `Last backup ${statusLabel}: ${timeAgo(lastResultTime)}` : `Last backup ${statusLabel}`,
+      title: backup.detail || `${taskName} status: ${status}`,
+      isStale: true,
+    };
+  }
+  return {
+    text: 'Last backup: never completed',
+    title: `${taskName} has no completed backup run recorded`,
+    isStale: true,
+  };
+}
+
 function renderOverviewEmbySnapshot(panel, snapshot) {
   const statusEl = panel.querySelector('[data-role="emby-status"]');
+  const backupEl = panel.querySelector('[data-role="emby-backup-status"]');
+  const sessionsSectionEl = panel.querySelector('[data-role="emby-sessions-section"]');
   const sessionsTitleEl = panel.querySelector('[data-role="emby-sessions-title"]');
   const sessionsListEl = panel.querySelector('[data-role="emby-sessions-list"]');
   const latestListEl = panel.querySelector('[data-role="emby-latest-list"]');
-  if (!statusEl || !sessionsTitleEl || !sessionsListEl || !latestListEl) return;
+  if (!statusEl || !backupEl || !sessionsSectionEl || !sessionsTitleEl || !sessionsListEl || !latestListEl) return;
 
   if (!snapshot) {
-    statusEl.textContent = 'Loading Emby…';
+    statusEl.textContent = '';
+    backupEl.textContent = 'Checking backup status…';
+    backupEl.classList.remove('is-stale');
+    backupEl.title = 'Checking backup status';
+    sessionsSectionEl.classList.remove('is-hidden');
     sessionsTitleEl.style.display = '';
     sessionsListEl.innerHTML = '<div class="emby-panel-empty">Checking for active streams…</div>';
     latestListEl.innerHTML = '<div class="emby-panel-empty">Loading latest additions…</div>';
@@ -2282,6 +2338,10 @@ function renderOverviewEmbySnapshot(panel, snapshot) {
 
   if (snapshot.error) {
     statusEl.textContent = snapshot.error;
+    backupEl.textContent = 'Last backup: unavailable';
+    backupEl.classList.add('is-stale');
+    backupEl.title = 'Backup status unavailable while Emby data is unavailable';
+    sessionsSectionEl.classList.remove('is-hidden');
     sessionsTitleEl.style.display = '';
     sessionsListEl.innerHTML = `<div class="emby-panel-empty">${escapeHtml(snapshot.detail || 'Unable to reach Emby right now.')}</div>`;
     latestListEl.innerHTML = '<div class="emby-panel-empty">No recent media available.</div>';
@@ -2290,11 +2350,12 @@ function renderOverviewEmbySnapshot(panel, snapshot) {
 
   const sessions = Array.isArray(snapshot.active_sessions) ? snapshot.active_sessions : [];
   const recentItems = Array.isArray(snapshot.recent_items) ? snapshot.recent_items : [];
-  const watchingLabel = sessions.length
-    ? `${sessions.length} watching now`
-    : 'Nobody is watching right now';
-  const userLabel = snapshot.resolved_user_name ? `Latest for ${snapshot.resolved_user_name}` : 'Latest additions';
-  statusEl.textContent = `${watchingLabel} · ${userLabel}`;
+  statusEl.textContent = '';
+  const backupDisplay = getEmbyBackupDisplay(snapshot.backup);
+  backupEl.textContent = backupDisplay.text;
+  backupEl.classList.toggle('is-stale', backupDisplay.isStale);
+  backupEl.title = backupDisplay.title;
+  sessionsSectionEl.classList.toggle('is-hidden', !sessions.length);
   sessionsTitleEl.style.display = sessions.length ? '' : 'none';
 
   sessionsListEl.innerHTML = sessions.length

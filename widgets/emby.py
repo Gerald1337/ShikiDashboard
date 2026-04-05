@@ -55,12 +55,30 @@ CSS = r"""
   font-size: 12px;
   color: var(--muted);
   font-weight: 500;
+  margin-bottom: 8px;
+}
+.emby-panel-status:empty {
+  display: none;
+  margin-bottom: 0;
+}
+.emby-panel-backup-status {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
   margin-bottom: 12px;
+}
+.emby-panel-backup-status.is-stale {
+  color: #ff6b6b;
 }
 .emby-panel-section {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+.emby-panel-section.is-hidden {
+  display: none;
 }
 .emby-panel-section + .emby-panel-section {
   margin-top: 14px;
@@ -180,7 +198,8 @@ def render_widget(instance):
           </div>
           <div class="panel-body">
             <div class="emby-panel-status" data-role="emby-status">Loading Emby…</div>
-            <div class="emby-panel-section">
+            <div class="emby-panel-backup-status" data-role="emby-backup-status">Checking backup status…</div>
+            <div class="emby-panel-section" data-role="emby-sessions-section">
               <div class="emby-panel-section-title" data-role="emby-sessions-title">Watching Now</div>
               <div class="emby-panel-list" data-role="emby-sessions-list">
                 <div class="emby-panel-empty">Checking for active streams…</div>

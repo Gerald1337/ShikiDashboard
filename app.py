@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
@@ -56,6 +56,7 @@ from widgets import (
 app = Flask(__name__)
 TAB_SECTIONS = {"overview", "services", "hosts", "disks", "debrid"}
 EMBY_RECENT_LIMIT = 6
+EMBY_BACKUP_STALE_HOURS = 49
 
 
 def parse_int(value, default, minimum=None, maximum=None):
@@ -170,6 +171,20 @@ def build_emby_image_url(host, token, item_id, *, item_type="Items", max_height=
     if max_width:
         query["MaxWidth"] = int(max_width)
     return f"{host}/{item_type}/{normalized_id}/Images/Primary?{urlencode(query)}"
+
+
+def parse_emby_datetime(value):
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    if not normalized:
+        return None
+    if normalized.endswith("Z"):
+        normalized = f"{normalized[:-1]}+00:00"
+    try:
+        return datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
 
 
 def normalize_emby_user(item):
@@ -303,6 +318,84 @@ def group_emby_recent_items(items, limit):
     return grouped
 
 
+def pick_emby_backup_task(tasks):
+    best_task = None
+    best_score = -1
+    for task in tasks or []:
+        if not isinstance(task, dict):
+            continue
+        name = str(task.get("Name") or "").strip()
+        key = str(task.get("Key") or "").strip()
+        description = str(task.get("Description") or "").strip()
+        category = str(task.get("Category") or "").strip()
+        haystack = " ".join(part.lower() for part in (name, key, description, category) if part)
+        if "backup" not in haystack:
+            continue
+        score = 1
+        if name.lower() == "emby server backup":
+            score = 5
+        elif "emby server backup" in haystack:
+            score = 4
+        elif "server" in haystack:
+            score = 3
+        if score > best_score:
+            best_task = task
+            best_score = score
+    return best_task
+
+
+def fetch_emby_backup_status(host, token):
+    try:
+        tasks_payload = fetch_emby_json(host, token, "/ScheduledTasks")
+    except req_lib.HTTPError as exc:
+        status_code = exc.response.status_code if exc.response is not None else None
+        detail = exc.response.text.strip() if exc.response is not None else str(exc)
+        return {
+            "error": "Unable to load backup task",
+            "detail": detail or str(exc),
+            "status_code": status_code,
+            "is_stale": True,
+        }
+    except req_lib.RequestException as exc:
+        return {
+            "error": "Unable to load backup task",
+            "detail": str(exc),
+            "is_stale": True,
+        }
+
+    backup_task = pick_emby_backup_task(tasks_payload if isinstance(tasks_payload, list) else [])
+    if not backup_task:
+        return {
+            "error": "Backup task not found",
+            "detail": "No scheduled task with backup metadata was returned by Emby.",
+            "is_stale": True,
+        }
+
+    last_result = backup_task.get("LastExecutionResult") if isinstance(backup_task.get("LastExecutionResult"), dict) else {}
+    status = str(last_result.get("Status") or "").strip() or None
+    ended_at = last_result.get("EndTimeUtc")
+    ended_at_dt = parse_emby_datetime(ended_at)
+    completed_at = ended_at if status == "Completed" and ended_at_dt else None
+    age_hours = None
+    if completed_at and ended_at_dt is not None:
+        age_hours = max(0.0, (datetime.now(timezone.utc) - ended_at_dt.astimezone(timezone.utc)).total_seconds() / 3600)
+
+    return {
+        "task_name": str(backup_task.get("Name") or "").strip() or "Backup",
+        "task_key": str(backup_task.get("Key") or "").strip() or None,
+        "status": status,
+        "last_result_end_time": ended_at if ended_at_dt else None,
+        "last_completed_at": completed_at,
+        "age_hours": round(age_hours, 2) if age_hours is not None else None,
+        "is_stale": (
+            status != "Completed"
+            or completed_at is None
+            or (age_hours is not None and age_hours > EMBY_BACKUP_STALE_HOURS)
+        ),
+        "detail": str(last_result.get("ErrorMessage") or "").strip() or None,
+    }
+
+
 def build_emby_widget_payload(host, token, user_id=None):
     normalized_host = normalize_emby_host(host)
     normalized_token = (token or "").strip()
@@ -342,6 +435,7 @@ def build_emby_widget_payload(host, token, user_id=None):
             latest_items.append(normalized)
 
     grouped_recent_items = group_emby_recent_items(latest_items, EMBY_RECENT_LIMIT)
+    backup_status = fetch_emby_backup_status(normalized_host, normalized_token)
 
     for session in sessions:
         session["user_image_url"] = build_emby_image_url(
@@ -370,6 +464,7 @@ def build_emby_widget_payload(host, token, user_id=None):
         "users": users,
         "active_sessions": sessions,
         "recent_items": grouped_recent_items[:EMBY_RECENT_LIMIT],
+        "backup": backup_status,
         "updated_at": datetime.now().isoformat(),
     }
 
