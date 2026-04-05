@@ -1249,9 +1249,6 @@ canvas { display:block; width:100% !important; }
       <span class="tab-badge" id="tab-disks-badge" aria-hidden="true"></span>
       <span>Disks</span>
     </a>
-    <a class="tab-item{% if initial_section == 'debrid' %} active{% endif %}" id="tab-debrid" href="/debrid" onclick="return handleTabClick(event, 'debrid')">
-      <span class="tab-icon material-icons">cloud</span><span>Debrid</span>
-    </a>
   </nav>
 
 </div>
@@ -2027,8 +2024,10 @@ function navigate(section, options = {}) {
   if (section !== 'debrid' && section !== 'overview') stopDebridQueueMonitor();
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-  document.getElementById('section-' + section).classList.add('active');
-  document.getElementById('tab-' + section).classList.add('active');
+  const sectionEl = document.getElementById('section-' + section);
+  if (sectionEl) sectionEl.classList.add('active');
+  const tabEl = document.getElementById('tab-' + section);
+  if (tabEl) tabEl.classList.add('active');
   currentSection = section;
   document.querySelector('.content').scrollTop = 0;
   if (section === 'overview') startHostStatsPoll();
