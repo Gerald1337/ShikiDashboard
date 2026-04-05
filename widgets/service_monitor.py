@@ -1,7 +1,7 @@
 from html import escape
 
-TYPE_ID = "service_status"
-LABEL = "Service Status"
+TYPE_ID = "service_monitor"
+LABEL = "Service Monitor"
 META = "External and local health summary"
 DEFAULT_TITLE = LABEL
 

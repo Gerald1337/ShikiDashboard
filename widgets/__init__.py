@@ -1,69 +1,69 @@
 from copy import deepcopy
 import re
 
-from .debrid_queue import (
-    CSS as DEBRID_QUEUE_WIDGET_CSS,
-    DEFAULT_TITLE as DEBRID_QUEUE_WIDGET_DEFAULT_TITLE,
-    LABEL as DEBRID_QUEUE_WIDGET_LABEL,
-    META as DEBRID_QUEUE_WIDGET_META,
-    TYPE_ID as DEBRID_QUEUE_WIDGET_TYPE,
-    render_widget as render_debrid_queue_widget,
+from .rdt_client import (
+    CSS as RDT_CLIENT_WIDGET_CSS,
+    DEFAULT_TITLE as RDT_CLIENT_WIDGET_DEFAULT_TITLE,
+    LABEL as RDT_CLIENT_WIDGET_LABEL,
+    META as RDT_CLIENT_WIDGET_META,
+    TYPE_ID as RDT_CLIENT_WIDGET_TYPE,
+    render_widget as render_rdt_client_widget,
 )
-from .drive_status import (
-    CSS as DRIVE_STATUS_WIDGET_CSS,
-    DEFAULT_TITLE as DRIVE_STATUS_WIDGET_DEFAULT_TITLE,
-    LABEL as DRIVE_STATUS_WIDGET_LABEL,
-    META as DRIVE_STATUS_WIDGET_META,
-    TYPE_ID as DRIVE_STATUS_WIDGET_TYPE,
-    render_widget as render_drive_status_widget,
+from .drive_monitor import (
+    CSS as DRIVE_MONITOR_WIDGET_CSS,
+    DEFAULT_TITLE as DRIVE_MONITOR_WIDGET_DEFAULT_TITLE,
+    LABEL as DRIVE_MONITOR_WIDGET_LABEL,
+    META as DRIVE_MONITOR_WIDGET_META,
+    TYPE_ID as DRIVE_MONITOR_WIDGET_TYPE,
+    render_widget as render_drive_monitor_widget,
 )
-from .host_resources import (
-    CSS as HOST_RESOURCES_WIDGET_CSS,
-    DEFAULT_TITLE as HOST_RESOURCES_WIDGET_DEFAULT_TITLE,
-    LABEL as HOST_RESOURCES_WIDGET_LABEL,
-    META as HOST_RESOURCES_WIDGET_META,
-    TYPE_ID as HOST_RESOURCES_WIDGET_TYPE,
-    render_widget as render_host_resources_widget,
+from .resource_monitor import (
+    CSS as RESOURCE_MONITOR_WIDGET_CSS,
+    DEFAULT_TITLE as RESOURCE_MONITOR_WIDGET_DEFAULT_TITLE,
+    LABEL as RESOURCE_MONITOR_WIDGET_LABEL,
+    META as RESOURCE_MONITOR_WIDGET_META,
+    TYPE_ID as RESOURCE_MONITOR_WIDGET_TYPE,
+    render_widget as render_resource_monitor_widget,
 )
-from .service_status import (
-    CSS as SERVICE_STATUS_WIDGET_CSS,
-    DEFAULT_TITLE as SERVICE_STATUS_WIDGET_DEFAULT_TITLE,
-    LABEL as SERVICE_STATUS_WIDGET_LABEL,
-    META as SERVICE_STATUS_WIDGET_META,
-    TYPE_ID as SERVICE_STATUS_WIDGET_TYPE,
-    render_widget as render_service_status_widget,
+from .service_monitor import (
+    CSS as SERVICE_MONITOR_WIDGET_CSS,
+    DEFAULT_TITLE as SERVICE_MONITOR_WIDGET_DEFAULT_TITLE,
+    LABEL as SERVICE_MONITOR_WIDGET_LABEL,
+    META as SERVICE_MONITOR_WIDGET_META,
+    TYPE_ID as SERVICE_MONITOR_WIDGET_TYPE,
+    render_widget as render_service_monitor_widget,
 )
 
 INSTANCE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 
 WIDGET_TYPES = {
-    HOST_RESOURCES_WIDGET_TYPE: {
-        "label": HOST_RESOURCES_WIDGET_LABEL,
-        "meta": HOST_RESOURCES_WIDGET_META,
-        "default_title": HOST_RESOURCES_WIDGET_DEFAULT_TITLE,
-        "render": render_host_resources_widget,
-        "css": HOST_RESOURCES_WIDGET_CSS,
+    RESOURCE_MONITOR_WIDGET_TYPE: {
+        "label": RESOURCE_MONITOR_WIDGET_LABEL,
+        "meta": RESOURCE_MONITOR_WIDGET_META,
+        "default_title": RESOURCE_MONITOR_WIDGET_DEFAULT_TITLE,
+        "render": render_resource_monitor_widget,
+        "css": RESOURCE_MONITOR_WIDGET_CSS,
     },
-    SERVICE_STATUS_WIDGET_TYPE: {
-        "label": SERVICE_STATUS_WIDGET_LABEL,
-        "meta": SERVICE_STATUS_WIDGET_META,
-        "default_title": SERVICE_STATUS_WIDGET_DEFAULT_TITLE,
-        "render": render_service_status_widget,
-        "css": SERVICE_STATUS_WIDGET_CSS,
+    SERVICE_MONITOR_WIDGET_TYPE: {
+        "label": SERVICE_MONITOR_WIDGET_LABEL,
+        "meta": SERVICE_MONITOR_WIDGET_META,
+        "default_title": SERVICE_MONITOR_WIDGET_DEFAULT_TITLE,
+        "render": render_service_monitor_widget,
+        "css": SERVICE_MONITOR_WIDGET_CSS,
     },
-    DRIVE_STATUS_WIDGET_TYPE: {
-        "label": DRIVE_STATUS_WIDGET_LABEL,
-        "meta": DRIVE_STATUS_WIDGET_META,
-        "default_title": DRIVE_STATUS_WIDGET_DEFAULT_TITLE,
-        "render": render_drive_status_widget,
-        "css": DRIVE_STATUS_WIDGET_CSS,
+    DRIVE_MONITOR_WIDGET_TYPE: {
+        "label": DRIVE_MONITOR_WIDGET_LABEL,
+        "meta": DRIVE_MONITOR_WIDGET_META,
+        "default_title": DRIVE_MONITOR_WIDGET_DEFAULT_TITLE,
+        "render": render_drive_monitor_widget,
+        "css": DRIVE_MONITOR_WIDGET_CSS,
     },
-    DEBRID_QUEUE_WIDGET_TYPE: {
-        "label": DEBRID_QUEUE_WIDGET_LABEL,
-        "meta": DEBRID_QUEUE_WIDGET_META,
-        "default_title": DEBRID_QUEUE_WIDGET_DEFAULT_TITLE,
-        "render": render_debrid_queue_widget,
-        "css": DEBRID_QUEUE_WIDGET_CSS,
+    RDT_CLIENT_WIDGET_TYPE: {
+        "label": RDT_CLIENT_WIDGET_LABEL,
+        "meta": RDT_CLIENT_WIDGET_META,
+        "default_title": RDT_CLIENT_WIDGET_DEFAULT_TITLE,
+        "render": render_rdt_client_widget,
+        "css": RDT_CLIENT_WIDGET_CSS,
     },
 }
 
@@ -77,36 +77,47 @@ OVERVIEW_WIDGET_TYPE_METADATA = {
 
 DEFAULT_OVERVIEW_WIDGET_LAYOUT = [
     {
-        "instance_id": "host_resources_main",
-        "type": HOST_RESOURCES_WIDGET_TYPE,
-        "title": HOST_RESOURCES_WIDGET_DEFAULT_TITLE,
+        "instance_id": "resource_monitor_main",
+        "type": RESOURCE_MONITOR_WIDGET_TYPE,
+        "title": RESOURCE_MONITOR_WIDGET_DEFAULT_TITLE,
         "config": {},
     },
     {
-        "instance_id": "service_status_main",
-        "type": SERVICE_STATUS_WIDGET_TYPE,
-        "title": SERVICE_STATUS_WIDGET_DEFAULT_TITLE,
+        "instance_id": "service_monitor_main",
+        "type": SERVICE_MONITOR_WIDGET_TYPE,
+        "title": SERVICE_MONITOR_WIDGET_DEFAULT_TITLE,
         "config": {},
     },
     {
-        "instance_id": "drive_status_main",
-        "type": DRIVE_STATUS_WIDGET_TYPE,
-        "title": DRIVE_STATUS_WIDGET_DEFAULT_TITLE,
+        "instance_id": "drive_monitor_main",
+        "type": DRIVE_MONITOR_WIDGET_TYPE,
+        "title": DRIVE_MONITOR_WIDGET_DEFAULT_TITLE,
         "config": {},
     },
     {
-        "instance_id": "debrid_queue_main",
-        "type": DEBRID_QUEUE_WIDGET_TYPE,
-        "title": DEBRID_QUEUE_WIDGET_DEFAULT_TITLE,
+        "instance_id": "rdt_client_main",
+        "type": RDT_CLIENT_WIDGET_TYPE,
+        "title": RDT_CLIENT_WIDGET_DEFAULT_TITLE,
         "config": {},
     },
 ]
 
 LEGACY_OVERVIEW_PANEL_TYPE_MAP = {
-    "host": HOST_RESOURCES_WIDGET_TYPE,
-    "services": SERVICE_STATUS_WIDGET_TYPE,
-    "drives": DRIVE_STATUS_WIDGET_TYPE,
-    "debrid": DEBRID_QUEUE_WIDGET_TYPE,
+    "host": RESOURCE_MONITOR_WIDGET_TYPE,
+    "services": SERVICE_MONITOR_WIDGET_TYPE,
+    "drives": DRIVE_MONITOR_WIDGET_TYPE,
+    "debrid": RDT_CLIENT_WIDGET_TYPE,
+    "host_resources": RESOURCE_MONITOR_WIDGET_TYPE,
+    "service_status": SERVICE_MONITOR_WIDGET_TYPE,
+    "drive_status": DRIVE_MONITOR_WIDGET_TYPE,
+    "debrid_queue": RDT_CLIENT_WIDGET_TYPE,
+}
+
+LEGACY_OVERVIEW_WIDGET_INSTANCE_MAP = {
+    "host_resources_main": "resource_monitor_main",
+    "service_status_main": "service_monitor_main",
+    "drive_status_main": "drive_monitor_main",
+    "debrid_queue_main": "rdt_client_main",
 }
 
 OVERVIEW_WIDGET_STYLES = "\n".join(
@@ -161,6 +172,8 @@ def sanitize_overview_widget_layout(layout):
         for item in layout:
             widget = default_by_instance.get(item)
             if widget is None:
+                widget = default_by_instance.get(LEGACY_OVERVIEW_WIDGET_INSTANCE_MAP.get(item, ""))
+            if widget is None:
                 widget = default_by_type.get(LEGACY_OVERVIEW_PANEL_TYPE_MAP.get(item))
             if widget and widget["instance_id"] not in seen:
                 sanitized.append(_clone_widget_instance(widget))
@@ -175,10 +188,11 @@ def sanitize_overview_widget_layout(layout):
     for item in layout:
         if not isinstance(item, dict):
             continue
-        type_id = item.get("type")
+        type_id = LEGACY_OVERVIEW_PANEL_TYPE_MAP.get(item.get("type"), item.get("type"))
         if type_id not in WIDGET_TYPES:
             continue
         instance_id = _sanitize_instance_id(item.get("instance_id"))
+        instance_id = LEGACY_OVERVIEW_WIDGET_INSTANCE_MAP.get(instance_id, instance_id)
         if not instance_id or instance_id in seen:
             continue
         default_widget = default_by_type.get(type_id)

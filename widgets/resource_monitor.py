@@ -1,7 +1,7 @@
 from html import escape
 
-TYPE_ID = "host_resources"
-LABEL = "Host Resource Statistics"
+TYPE_ID = "resource_monitor"
+LABEL = "Resource Monitor"
 META = "CPU, RAM, and network activity snapshot"
 DEFAULT_TITLE = LABEL
 

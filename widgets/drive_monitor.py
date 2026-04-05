@@ -1,7 +1,7 @@
 from html import escape
 
-TYPE_ID = "drive_status"
-LABEL = "Drive Status"
+TYPE_ID = "drive_monitor"
+LABEL = "Drive Monitor"
 META = "Temperature and health overview"
 DEFAULT_TITLE = LABEL
 

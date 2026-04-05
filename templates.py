@@ -1497,7 +1497,7 @@ canvas { display:block; width:100% !important; }
     <div class="modal-header">
       <div>
         <h2>Queue Magnet Link</h2>
-        <div class="modal-subtitle">Paste a magnet link from the overview Debrid Queue widget and send it to the Debrid client.</div>
+        <div class="modal-subtitle">Paste a magnet link from the overview RDT Client widget and send it to the Debrid client.</div>
       </div>
       <button class="icon-btn modal-close-btn" type="button" onclick="closeOverviewDebridMagnetModal()" title="Close">
         <span class="material-icons">close</span>
@@ -2196,7 +2196,7 @@ function updateHostStats(stats) {
   latestHostStats = hosts;
   hasLoadedHostStats = true;
   hostsCache = hosts;
-  const panels = Array.from(document.querySelectorAll('.overview-panel[data-widget-type="host_resources"]'));
+  const panels = Array.from(document.querySelectorAll('.overview-panel[data-widget-type="resource_monitor"]'));
   if (!panels.length) return;
   const hostMap = new Map(hosts.map(host => [host.id, host]));
 
@@ -2349,7 +2349,7 @@ async function loadOverview(useCache = true) {
 
 function renderOverviewDrives(drives) {
   updateDiskTabNotification(drives);
-  const slots = Array.from(document.querySelectorAll('[data-widget-slot="drive_status"]'));
+  const slots = Array.from(document.querySelectorAll('[data-widget-slot="drive_monitor"]'));
   slots.forEach(slot => {
     const widget = getOverviewWidgetForElement(slot);
     const widgetDrives = applyOverviewWidgetLimit(drives, widget);
@@ -2376,7 +2376,7 @@ function renderOverviewDrives(drives) {
 }
 
 function renderOverviewServices(services) {
-  const slots = Array.from(document.querySelectorAll('[data-widget-slot="service_status"]'));
+  const slots = Array.from(document.querySelectorAll('[data-widget-slot="service_monitor"]'));
   slots.forEach(slot => {
     const widget = getOverviewWidgetForElement(slot);
     const widgetServices = applyOverviewWidgetLimit(services, widget);
@@ -2517,10 +2517,20 @@ function renderDrivesGrid(drives) {
 const DEFAULT_OVERVIEW_WIDGET_LAYOUT = {{ overview_widget_layout_json|safe }};
 const OVERVIEW_WIDGET_TYPE_METADATA = {{ overview_widget_type_metadata_json|safe }};
 const LEGACY_OVERVIEW_WIDGET_TYPE_MAP = {
-  host: 'host_resources',
-  services: 'service_status',
-  drives: 'drive_status',
-  debrid: 'debrid_queue',
+  host: 'resource_monitor',
+  services: 'service_monitor',
+  drives: 'drive_monitor',
+  debrid: 'rdt_client',
+  host_resources: 'resource_monitor',
+  service_status: 'service_monitor',
+  drive_status: 'drive_monitor',
+  debrid_queue: 'rdt_client',
+};
+const LEGACY_OVERVIEW_WIDGET_INSTANCE_MAP = {
+  host_resources_main: 'resource_monitor_main',
+  service_status_main: 'service_monitor_main',
+  drive_status_main: 'drive_monitor_main',
+  debrid_queue_main: 'rdt_client_main',
 };
 let overviewWidgetLayout = sanitizeOverviewWidgetLayout(DEFAULT_OVERVIEW_WIDGET_LAYOUT);
 
@@ -2560,6 +2570,9 @@ function sanitizeOverviewWidgetLayout(layout) {
     const seen = new Set();
     layout.forEach(item => {
       let widget = defaultByInstance[item];
+      if (!widget && LEGACY_OVERVIEW_WIDGET_INSTANCE_MAP[item]) {
+        widget = defaultByInstance[LEGACY_OVERVIEW_WIDGET_INSTANCE_MAP[item]];
+      }
       if (!widget && LEGACY_OVERVIEW_WIDGET_TYPE_MAP[item]) {
         widget = defaultByType[LEGACY_OVERVIEW_WIDGET_TYPE_MAP[item]];
       }
@@ -2580,9 +2593,10 @@ function sanitizeOverviewWidgetLayout(layout) {
   const seen = new Set();
   layout.forEach(item => {
     if (!item || typeof item !== 'object' || Array.isArray(item)) return;
-    const type = item.type;
+    const type = LEGACY_OVERVIEW_WIDGET_TYPE_MAP[item.type] || item.type;
     if (!OVERVIEW_WIDGET_TYPE_METADATA[type]) return;
-    const instanceId = sanitizeOverviewWidgetInstanceId(item.instance_id);
+    const rawInstanceId = sanitizeOverviewWidgetInstanceId(item.instance_id);
+    const instanceId = LEGACY_OVERVIEW_WIDGET_INSTANCE_MAP[rawInstanceId] || rawInstanceId;
     if (!instanceId || seen.has(instanceId)) return;
     const defaultWidget = defaultByType[type];
     const title = typeof item.title === 'string' && item.title.trim()
@@ -2620,7 +2634,7 @@ function refreshOverviewWidgetsFromCache() {
   if (hasLoadedHostStats) updateHostStats(latestHostStats);
   if (hasLoadedOverviewDriveData) renderOverviewDrives(drivesCache);
   if (hasLoadedOverviewServiceData) renderOverviewServices(servicesCache);
-  if (hasLoadedOverviewDebrid) renderOverviewDebridQueue(latestOverviewDebridStatus, debridQueueSnapshot);
+  if (hasLoadedOverviewDebrid) renderOverviewRdtClient(latestOverviewDebridStatus, debridQueueSnapshot);
 }
 
 function replaceOverviewWidgetMarkup(widgetsHtml) {
@@ -4125,14 +4139,14 @@ function formatOverviewQueueLabel(totalItems, completedItems = 0) {
   return `${queueLabel} · ${completedLabel}`;
 }
 
-function renderOverviewDebridQueue(status, items = []) {
+function renderOverviewRdtClient(status, items = []) {
   latestOverviewDebridStatus = status || 'Queue unavailable';
   hasLoadedOverviewDebrid = true;
-  const panels = Array.from(document.querySelectorAll('.overview-panel[data-widget-type="debrid_queue"]'));
+  const panels = Array.from(document.querySelectorAll('.overview-panel[data-widget-type="rdt_client"]'));
   panels.forEach(panel => {
     const widget = getOverviewWidgetForElement(panel);
     const statusEl = panel.querySelector('[data-role="overview-debrid-status"]');
-    const listEl = panel.querySelector('[data-widget-slot="debrid_queue"]');
+    const listEl = panel.querySelector('[data-widget-slot="rdt_client"]');
     if (statusEl) statusEl.textContent = status || 'Queue unavailable';
     if (!listEl) return;
 
@@ -4310,12 +4324,12 @@ async function loadDebridConfig() {
     debridConfig = await resp.json() || { ip: '', username: '', password: '', updated_at: null };
     renderDebridInfo();
     if (!debridConfig.ip || !debridConfig.username) {
-      renderOverviewDebridQueue('Not configured', []);
+      renderOverviewRdtClient('Not configured', []);
     }
     if (currentSection === 'debrid' || currentSection === 'overview') startDebridQueueMonitor();
   } catch (err) {
     console.error('Failed to load debrid config', err);
-    renderOverviewDebridQueue('Unable to load configuration', []);
+    renderOverviewRdtClient('Unable to load configuration', []);
   }
 }
 
@@ -4374,7 +4388,7 @@ function updateDebridQueueDisplay(status, body, items = []) {
   } else if (status && /^http\s+\d+/i.test(status)) {
     overviewStatus = 'Queue empty';
   }
-  renderOverviewDebridQueue(overviewStatus, debridQueueSnapshot);
+  renderOverviewRdtClient(overviewStatus, debridQueueSnapshot);
 }
 
 function startDebridQueueMonitor() {

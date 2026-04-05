@@ -130,7 +130,11 @@ def get_saved_overview_widget_layout():
             parsed = json.loads(raw)
         except json.JSONDecodeError:
             parsed = None
-    return sanitize_overview_widget_layout(parsed)
+    layout = sanitize_overview_widget_layout(parsed)
+    normalized_layout_json = json.dumps(layout)
+    if raw != normalized_layout_json:
+        set_app_setting("overview_panel_order", normalized_layout_json)
+    return layout
 
 
 def render_dashboard(initial_section="overview"):
@@ -199,7 +203,7 @@ def api_save_debrid_config():
 
 
 @app.route("/api/debrid-queue")
-def api_debrid_queue():
+def api_rdt_client_queue():
     ip, username, password = get_debrid_connection_details()
     if not ip or not username:
         return jsonify({"error": "Debrid client is not configured"}), 400

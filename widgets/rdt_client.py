@@ -1,7 +1,7 @@
 from html import escape
 
-TYPE_ID = "debrid_queue"
-LABEL = "Debrid Queue"
+TYPE_ID = "rdt_client"
+LABEL = "RDT Client"
 META = "Active torrent queue"
 DEFAULT_TITLE = LABEL
 
