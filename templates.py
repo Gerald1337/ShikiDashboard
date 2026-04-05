@@ -1473,6 +1473,31 @@ canvas { display:block; width:100% !important; }
   </div>
 </div>
 
+<div class="modal-overlay" id="overview-debrid-magnet-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h2>Queue Magnet Link</h2>
+        <div class="modal-subtitle">Paste a magnet link from the overview Debrid Queue widget and send it to the Debrid client.</div>
+      </div>
+      <button class="icon-btn modal-close-btn" type="button" onclick="closeOverviewDebridMagnetModal()" title="Close">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="overview-debrid-magnet-input">Magnet Link</label>
+      <input class="form-input" id="overview-debrid-magnet-input" type="text" autocomplete="off" placeholder="magnet:?xt=urn:btih:..."/>
+    </div>
+    <div class="debrid-magnet-status" id="overview-debrid-magnet-modal-status" aria-live="polite"></div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" type="button" onclick="closeOverviewDebridMagnetModal()">Cancel</button>
+      <button class="btn-primary" type="button" id="overview-debrid-magnet-submit-btn" onclick="submitOverviewDebridMagnetModal()">Queue Magnet</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="debrid-queue-action-modal">
   <div class="modal">
     <div class="modal-header">
@@ -3731,6 +3756,7 @@ document.getElementById('reorder-modal').addEventListener('click', e => { if(e.t
 document.getElementById('overview-widget-rename-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeOverviewWidgetRenameModal(); });
 document.getElementById('logo-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeLogoModal(); });
 document.getElementById('debrid-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeDebridModal(); });
+document.getElementById('overview-debrid-magnet-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeOverviewDebridMagnetModal(); });
 document.getElementById('debrid-queue-action-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeDebridQueueActionModal(); });
 document.getElementById('overview-widget-rename-input').addEventListener('keydown', event => {
   if (event.key === 'Enter') {
@@ -3739,6 +3765,15 @@ document.getElementById('overview-widget-rename-input').addEventListener('keydow
   } else if (event.key === 'Escape') {
     event.preventDefault();
     closeOverviewWidgetRenameModal();
+  }
+});
+document.getElementById('overview-debrid-magnet-input').addEventListener('keydown', event => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    submitOverviewDebridMagnetModal();
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    closeOverviewDebridMagnetModal();
   }
 });
 
@@ -4024,19 +4059,27 @@ function renderOverviewDebridQueue(status, items = []) {
 }
 
 function setDebridMagnetStatus(message, tone) {
-  const statusEl = document.getElementById('debrid-magnet-status');
-  if (!statusEl) return;
-  statusEl.textContent = message || '';
-  statusEl.classList.toggle('success', tone === 'success');
-  statusEl.classList.toggle('error', tone === 'error');
+  const statusElements = [
+    document.getElementById('debrid-magnet-status'),
+    document.getElementById('overview-debrid-magnet-modal-status'),
+    ...document.querySelectorAll('[data-role="overview-debrid-magnet-status"]'),
+  ].filter(Boolean);
+  if (!statusElements.length) return;
+  statusElements.forEach(statusEl => {
+    statusEl.textContent = message || '';
+    statusEl.classList.toggle('success', tone === 'success');
+    statusEl.classList.toggle('error', tone === 'error');
+  });
   if (magnetStatusTimer) {
     clearTimeout(magnetStatusTimer);
     magnetStatusTimer = null;
   }
   if (message) {
     magnetStatusTimer = setTimeout(() => {
-      statusEl.textContent = '';
-      statusEl.classList.remove('success', 'error');
+      statusElements.forEach(statusEl => {
+        statusEl.textContent = '';
+        statusEl.classList.remove('success', 'error');
+      });
       magnetStatusTimer = null;
     }, 5000);
   }
@@ -4076,6 +4119,9 @@ async function submitMagnetLink(magnetLink, inputElement) {
       throw new Error(message);
     }
     setDebridMagnetStatus('Magnet queued for ingestion!', 'success');
+    if (inputElement?.id === 'overview-debrid-magnet-input') {
+      closeOverviewDebridMagnetModal();
+    }
     if (inputElement) inputElement.value = '';
   } catch (err) {
     console.error('Failed to submit magnet link', err);
@@ -4087,6 +4133,12 @@ async function submitMagnetLink(magnetLink, inputElement) {
 }
 
 function handleMagnetPaste(event) {
+  const clipboardValue = event.clipboardData?.getData('text') || window.clipboardData?.getData('Text') || '';
+  if (clipboardValue.trim()) {
+    event.preventDefault();
+    submitMagnetLink(clipboardValue, event.target);
+    return;
+  }
   const input = event.target;
   setTimeout(() => {
     const value = (input?.value || '').trim();
@@ -4106,6 +4158,32 @@ function setupDebridMagnetInput() {
       submitMagnetLink((input.value || '').trim(), input);
     }
   });
+}
+
+function openOverviewDebridMagnetModal() {
+  const modal = document.getElementById('overview-debrid-magnet-modal');
+  const input = document.getElementById('overview-debrid-magnet-input');
+  if (!modal || !input) return;
+  input.value = '';
+  modal.classList.add('open');
+  setDebridMagnetStatus('', null);
+  setTimeout(() => input.focus(), 0);
+}
+
+function closeOverviewDebridMagnetModal() {
+  const modal = document.getElementById('overview-debrid-magnet-modal');
+  const input = document.getElementById('overview-debrid-magnet-input');
+  if (modal) modal.classList.remove('open');
+  if (input) {
+    input.value = '';
+    input.disabled = false;
+  }
+}
+
+function submitOverviewDebridMagnetModal() {
+  const input = document.getElementById('overview-debrid-magnet-input');
+  if (!input) return;
+  submitMagnetLink((input.value || '').trim(), input);
 }
 
 async function loadDebridConfig() {

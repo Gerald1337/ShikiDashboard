@@ -2,6 +2,7 @@ from datetime import datetime
 import json
 import socket
 import threading
+import time
 
 import requests as req_lib
 
@@ -21,6 +22,8 @@ HOST_STATS_WINDOW_SEC = 60
 LOCAL_HOST_ID = 0
 LOCAL_HOST_INTERVAL = 1
 host_timers = {}
+HOST_SAMPLE_CLEANUP_INTERVAL_SEC = 300
+_last_host_sample_cleanup = 0.0
 
 
 def get_local_host_definition():
@@ -107,10 +110,7 @@ def poll_local_host():
         save_host_sample(LOCAL_HOST_ID, reachable=reachable, error=error, stats=stats)
     except Exception as exc:
         save_host_sample(LOCAL_HOST_ID, reachable=False, error=str(exc), stats={})
-    try:
-        cleanup_old_host_samples()
-    except Exception:
-        pass
+    _maybe_cleanup_host_samples()
 
     timer = threading.Timer(LOCAL_HOST_INTERVAL, poll_local_host)
     timer.daemon = True
@@ -131,10 +131,7 @@ def poll_host(host_id):
         save_host_sample(host_id, reachable=reachable, error=error, stats=stats)
     except Exception as exc:
         save_host_sample(host_id, reachable=False, error=str(exc), stats={})
-    try:
-        cleanup_old_host_samples()
-    except Exception:
-        pass
+    _maybe_cleanup_host_samples()
 
     timer = threading.Timer(host["interval"], poll_host, args=[host_id])
     timer.daemon = True
@@ -207,4 +204,16 @@ def get_all_host_history(window_sec=HOST_STATS_WINDOW_SEC):
 
 
 def prune_host_history():
-    cleanup_old_host_samples()
+    _maybe_cleanup_host_samples(force=True)
+
+
+def _maybe_cleanup_host_samples(force=False):
+    global _last_host_sample_cleanup
+    now = time.monotonic()
+    if not force and now - _last_host_sample_cleanup < HOST_SAMPLE_CLEANUP_INTERVAL_SEC:
+        return
+    _last_host_sample_cleanup = now
+    try:
+        cleanup_old_host_samples()
+    except Exception:
+        pass
