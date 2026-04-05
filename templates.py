@@ -1,3 +1,12 @@
+from routes import (
+    DEBRID_SECTION_TEMPLATE,
+    DISKS_SECTION_TEMPLATE,
+    HOSTS_SECTION_TEMPLATE,
+    OVERVIEW_SECTION_TEMPLATE,
+    SERVICES_SECTION_TEMPLATE,
+)
+
+
 HTML = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1221,136 +1230,7 @@ canvas { display:block; width:100% !important; }
   </div>
 
   <div class="content">
-
-    <div class="section{% if initial_section == 'overview' %} active{% endif %}" id="section-overview">
-      <div class="overview-grid">
-{{ overview_widgets|safe }}
-      </div>
-    </div>
-
-    <div class="section{% if initial_section == 'disks' %} active{% endif %}" id="section-disks">
-      <div class="summary-strip">
-        <div class="summary-card total">
-          <div class="summary-label">Total</div>
-          <div class="summary-value" id="s-total">—</div>
-        </div>
-        <div class="summary-card healthy">
-          <div class="summary-label">Healthy</div>
-          <div class="summary-value" id="s-healthy">—</div>
-        </div>
-        <div class="summary-card failing">
-          <div class="summary-label">Failing</div>
-          <div class="summary-value" id="s-failing">—</div>
-        </div>
-        <div class="summary-card temp">
-          <div class="summary-label">Avg Temp</div>
-          <div class="summary-value" id="s-temp">—</div>
-        </div>
-      </div>
-      <div class="section-header">
-        <div>
-          <div class="section-title">Disks</div>
-          <div class="section-subtitle small-muted" id="disks-updated-text">Never scanned</div>
-        </div>
-        <div class="section-actions">
-          <button class="icon-btn" id="disks-refresh-btn" type="button" title="Refresh drives" aria-label="Refresh drives" onclick="refreshCurrent(true)">
-            <span class="material-icons">refresh</span>
-          </button>
-          <button class="icon-btn" type="button" title="Reorder drives" onclick="openReorderModal('drives')">
-            <span class="material-icons">settings</span>
-          </button>
-        </div>
-      </div>
-      <div id="drives-container">
-        <div class="loading"><div class="loading-spinner"></div>Scanning drives…</div>
-      </div>
-    </div>
-
-    <div class="section{% if initial_section == 'services' %} active{% endif %}" id="section-services">
-      <div class="summary-strip cols2">
-        <div class="summary-card up">
-          <div class="summary-label">Online</div>
-          <div class="summary-value" id="ss-up">—</div>
-        </div>
-        <div class="summary-card down">
-          <div class="summary-label">Offline</div>
-          <div class="summary-value" id="ss-down">—</div>
-        </div>
-      </div>
-      <div class="section-header">
-        <div>
-          <div class="section-title">Services</div>
-        </div>
-        <div class="section-actions">
-          <button class="icon-btn" type="button" title="Add Service" aria-label="Add Service" onclick="openAddModal()">
-            <span class="material-icons">add</span>
-          </button>
-          <button class="icon-btn" type="button" id="services-history-btn" title="Show service history" aria-label="Show service history" onclick="toggleServiceHistoryVisibility()">
-            <span class="material-icons" id="services-history-icon">expand_more</span>
-          </button>
-          <button class="icon-btn" type="button" title="Reorder services" onclick="openReorderModal('services')">
-            <span class="material-icons">settings</span>
-          </button>
-        </div>
-      </div>
-      <div id="services-container">
-        <div class="loading"><div class="loading-spinner"></div>Loading…</div>
-      </div>
-    </div>
-
-    <div class="section{% if initial_section == 'debrid' %} active{% endif %}" id="section-debrid">
-      <div class="section-header debrid-header">
-        <div>
-          <div class="section-title">Debrid Client</div>
-          <div class="section-subtitle small-muted" id="debrid-status">Not configured</div>
-        </div>
-        <div class="debrid-magnet-area">
-          <input autocomplete="off" class="form-input debrid-magnet-input" id="debrid-magnet-input" type="text" placeholder="Magnet Link"/>
-        </div>
-        <div class="section-actions">
-          <button class="icon-btn" type="button" id="debrid-queue-toggle-btn" title="Show queue panel" aria-label="Show queue panel" onclick="toggleDebridQueueVisibility()">
-            <span class="material-icons" id="debrid-queue-toggle-icon">expand_more</span>
-          </button>
-          <button class="icon-btn" type="button" title="Configure Debrid Client" aria-label="Configure Debrid Client" onclick="openDebridModal()">
-            <span class="material-icons">settings</span>
-          </button>
-        </div>
-      </div>
-      <div class="debrid-magnet-status" id="debrid-magnet-status" aria-live="polite"></div>
-      <div class="debrid-queue-list" id="debrid-queue-list">
-        <div class="debrid-queue-empty">Queue data will populate once the proxy succeeds.</div>
-      </div>
-      <div class="debrid-queue-wrapper hidden" id="debrid-queue-wrapper">
-        <div class="debrid-queue-card">
-          <div class="debrid-queue-header">
-            <span>Queue probe</span>
-            <span id="debrid-queue-time">—</span>
-          </div>
-          <div class="debrid-queue-status" id="debrid-queue-status">Waiting for configuration…</div>
-          <pre class="debrid-queue-body" id="debrid-queue-body">Response body appears here.</pre>
-        </div>
-      </div>
-    </div>
-
-    <div class="section{% if initial_section == 'hosts' %} active{% endif %}" id="section-hosts">
-      <div class="section-header">
-        <div>
-          <div class="section-title">Hosts</div>
-          <div class="section-subtitle small-muted">Remote machine resource monitoring with 1-minute charts and 1-hour retention.</div>
-        </div>
-        <div class="section-actions">
-          <button class="icon-btn" type="button" title="Add Host" aria-label="Add Host" onclick="openHostModal()">
-            <span class="material-icons">add</span>
-          </button>
-          <button class="icon-btn" type="button" title="Reorder hosts" onclick="openReorderModal('hosts')">
-            <span class="material-icons">settings</span>
-          </button>
-        </div>
-      </div>
-      <div id="hosts-container">
-        <div class="loading"><div class="loading-spinner"></div>Loading…</div>
-      </div>
-    </div>
+""" + OVERVIEW_SECTION_TEMPLATE + DISKS_SECTION_TEMPLATE + SERVICES_SECTION_TEMPLATE + DEBRID_SECTION_TEMPLATE + HOSTS_SECTION_TEMPLATE + r"""
 
   </div>
 

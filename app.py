@@ -42,6 +42,7 @@ from host_monitor import (
     kick_host_poll,
     stop_host_poll,
 )
+from routes import register_screen_routes
 from system_stats import get_system_stats
 from templates import HTML
 from widgets import (
@@ -146,30 +147,7 @@ def render_dashboard(initial_section="overview"):
     )
 
 
-@app.route("/")
-@app.route("/overview")
-def overview():
-    return render_dashboard("overview")
-
-
-@app.route("/services")
-def services():
-    return render_dashboard("services")
-
-
-@app.route("/disks")
-def disks():
-    return render_dashboard("disks")
-
-
-@app.route("/hosts")
-def hosts():
-    return render_dashboard("hosts")
-
-
-@app.route("/debrid")
-def debrid():
-    return render_dashboard("debrid")
+register_screen_routes(app, render_dashboard)
 
 
 @app.route("/api/app-logo")
