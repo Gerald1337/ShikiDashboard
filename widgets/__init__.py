@@ -33,6 +33,14 @@ from .service_monitor import (
     TYPE_ID as SERVICE_MONITOR_WIDGET_TYPE,
     render_widget as render_service_monitor_widget,
 )
+from .emby import (
+    CSS as EMBY_WIDGET_CSS,
+    DEFAULT_TITLE as EMBY_WIDGET_DEFAULT_TITLE,
+    LABEL as EMBY_WIDGET_LABEL,
+    META as EMBY_WIDGET_META,
+    TYPE_ID as EMBY_WIDGET_TYPE,
+    render_widget as render_emby_widget,
+)
 
 INSTANCE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 
@@ -64,6 +72,13 @@ WIDGET_TYPES = {
         "default_title": RDT_CLIENT_WIDGET_DEFAULT_TITLE,
         "render": render_rdt_client_widget,
         "css": RDT_CLIENT_WIDGET_CSS,
+    },
+    EMBY_WIDGET_TYPE: {
+        "label": EMBY_WIDGET_LABEL,
+        "meta": EMBY_WIDGET_META,
+        "default_title": EMBY_WIDGET_DEFAULT_TITLE,
+        "render": render_emby_widget,
+        "css": EMBY_WIDGET_CSS,
     },
 }
 
@@ -98,6 +113,12 @@ DEFAULT_OVERVIEW_WIDGET_LAYOUT = [
         "instance_id": "rdt_client_main",
         "type": RDT_CLIENT_WIDGET_TYPE,
         "title": RDT_CLIENT_WIDGET_DEFAULT_TITLE,
+        "config": {},
+    },
+    {
+        "instance_id": "emby_main",
+        "type": EMBY_WIDGET_TYPE,
+        "title": EMBY_WIDGET_DEFAULT_TITLE,
         "config": {},
     },
 ]

@@ -1432,6 +1432,46 @@ canvas { display:block; width:100% !important; }
   </div>
 </div>
 
+<div class="modal-overlay" id="overview-emby-widget-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h2>Emby Widget Settings</h2>
+        <div class="modal-subtitle">Add your Emby host and token, then optionally auto-pick a user for latest items.</div>
+      </div>
+      <button class="icon-btn modal-close-btn" type="button" onclick="closeOverviewEmbyWidgetModal()" title="Close">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="overview-emby-host-input">Emby Host</label>
+      <input class="form-input" id="overview-emby-host-input" type="text" placeholder="http://embyhost:8096 or https://emby.example.com/emby"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="overview-emby-token-input">Emby Token</label>
+      <input class="form-input" id="overview-emby-token-input" type="password" placeholder="API token"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="overview-emby-user-select">User</label>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <select class="form-select" id="overview-emby-user-select" style="flex:1 1 auto;">
+          <option value="">Auto-detect user</option>
+        </select>
+        <button class="btn-secondary" type="button" id="overview-emby-refresh-users-btn" onclick="refreshOverviewEmbyUsers()">Refresh Users</button>
+      </div>
+      <div class="small-muted" id="overview-emby-user-help" style="margin-top:8px;">Leave this on auto and the widget will use the first user returned by Emby.</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="overview-emby-user-id-input">User ID Override</label>
+      <input class="form-input" id="overview-emby-user-id-input" type="text" placeholder="Optional: paste a specific Emby user ID"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" type="button" onclick="closeOverviewEmbyWidgetModal()">Cancel</button>
+      <button class="btn-primary" type="button" id="overview-emby-widget-save-btn" onclick="submitOverviewEmbyWidgetModal()">Save Emby</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="logo-modal">
   <div class="modal logo-modal">
     <div class="modal-header">
@@ -1574,13 +1614,19 @@ let hasLoadedOverviewDriveData = false;
 let hasLoadedOverviewServiceData = false;
 let hasLoadedHostStats = false;
 let hasLoadedOverviewDebrid = false;
+let latestOverviewEmbySnapshots = {};
+let latestOverviewEmbyHealth = {};
+let hasLoadedOverviewEmby = false;
 let overviewWidgetRenameState = { instanceId: null, saving: false };
 let overviewHostWidgetState = { instanceId: null, saving: false };
+let overviewEmbyWidgetState = { instanceId: null, saving: false, loadingUsers: false, lastUsers: [] };
 let debridQueueActionState = { action: '', torrentId: '', rawTorrentId: null, torrentName: '' };
 let debridQueueActionSubmitting = false;
 let magnetSubmissionInProgress = false;
 let magnetStatusTimer = null;
 let _editingHostId = null;
+let embyOverviewTimer = null;
+let embyHealthTimer = null;
 
 const DEFAULT_FAVICON_DATA_URL = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2096%2096%22%3E%3Crect%20width%3D%2296%22%20height%3D%2296%22%20fill%3D%22%230a0c0f%22/%3E%3Ctext%20x%3D%2248%22%20y%3D%2258%22%20text-anchor%3D%22middle%22%20font-family%3D%22Inter%2Csans-serif%22%20font-size%3D%2256%22%20font-weight%3D%22700%22%20fill%3D%22%2300e5ff%22%3ES%3C/text%3E%3C/svg%3E";
 
@@ -2045,6 +2091,8 @@ function navigate(section, options = {}) {
   if (section !== 'services') stopSvcPoll();
   if (section !== 'hosts') stopHostsPoll();
   if (section !== 'debrid' && section !== 'overview') stopDebridQueueMonitor();
+  if (section !== 'overview') stopOverviewEmbyPoll();
+  if (section !== 'overview') stopOverviewEmbyHealthPoll();
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
   const sectionEl = document.getElementById('section-' + section);
@@ -2053,7 +2101,11 @@ function navigate(section, options = {}) {
   if (tabEl) tabEl.classList.add('active');
   currentSection = section;
   document.querySelector('.content').scrollTop = 0;
-  if (section === 'overview') startHostStatsPoll();
+  if (section === 'overview') {
+    startHostStatsPoll();
+    startOverviewEmbyPoll();
+    startOverviewEmbyHealthPoll();
+  }
   else stopHostStatsPoll();
   if (section === 'hosts') startHostsPoll();
   loadSectionData(section);
@@ -2166,6 +2218,284 @@ function setUpdated(timestamp) {
 function normalizeOverviewHostWidgetHostId(value) {
   const parsed = Number.parseInt(value, 10);
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function normalizeOverviewEmbyString(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function getOverviewEmbyConfig(widget) {
+  return {
+    host: normalizeOverviewEmbyString(widget?.config?.host),
+    token: normalizeOverviewEmbyString(widget?.config?.token),
+    user_id: normalizeOverviewEmbyString(widget?.config?.user_id),
+  };
+}
+
+function formatEmbyRecentItem(item) {
+  const type = (item?.type || '').toLowerCase();
+  const year = item?.production_year ? ` (${item.production_year})` : '';
+  if (type === 'episode') {
+    const season = Number.isFinite(Number(item?.parent_index_number))
+      ? `S${String(Math.max(0, Math.trunc(Number(item.parent_index_number)))).padStart(2, '0')}`
+      : null;
+    const episode = Number.isFinite(Number(item?.index_number))
+      ? `E${String(Math.max(0, Math.trunc(Number(item.index_number)))).padStart(2, '0')}`
+      : null;
+    const code = season || episode ? [season, episode].filter(Boolean).join('') : null;
+    const show = item?.series_name || 'Unknown series';
+    return code ? `${show} • ${code} • ${item?.name || 'Untitled'}` : `${show} • ${item?.name || 'Untitled'}`;
+  }
+  return `${item?.name || 'Untitled'}${year}`;
+}
+
+function formatEmbySessionItem(item) {
+  if ((item?.type || '').toLowerCase() === 'episode') {
+    const show = item?.series_name || item?.name || 'Untitled';
+    const season = Number.isFinite(Number(item?.parent_index_number))
+      ? `S${String(Math.max(0, Math.trunc(Number(item.parent_index_number)))).padStart(2, '0')}`
+      : null;
+    const episode = Number.isFinite(Number(item?.index_number))
+      ? `E${String(Math.max(0, Math.trunc(Number(item.index_number)))).padStart(2, '0')}`
+      : null;
+    const code = [season, episode].filter(Boolean).join('');
+    return code ? `${show} • ${code}` : show;
+  }
+  const year = item?.production_year ? ` (${item.production_year})` : '';
+  return `${item?.name || 'Untitled'}${year}`;
+}
+
+function renderOverviewEmbySnapshot(panel, snapshot) {
+  const statusEl = panel.querySelector('[data-role="emby-status"]');
+  const sessionsTitleEl = panel.querySelector('[data-role="emby-sessions-title"]');
+  const sessionsListEl = panel.querySelector('[data-role="emby-sessions-list"]');
+  const latestListEl = panel.querySelector('[data-role="emby-latest-list"]');
+  if (!statusEl || !sessionsTitleEl || !sessionsListEl || !latestListEl) return;
+
+  if (!snapshot) {
+    statusEl.textContent = 'Loading Emby…';
+    sessionsTitleEl.style.display = '';
+    sessionsListEl.innerHTML = '<div class="emby-panel-empty">Checking for active streams…</div>';
+    latestListEl.innerHTML = '<div class="emby-panel-empty">Loading latest additions…</div>';
+    return;
+  }
+
+  if (snapshot.error) {
+    statusEl.textContent = snapshot.error;
+    sessionsTitleEl.style.display = '';
+    sessionsListEl.innerHTML = `<div class="emby-panel-empty">${escapeHtml(snapshot.detail || 'Unable to reach Emby right now.')}</div>`;
+    latestListEl.innerHTML = '<div class="emby-panel-empty">No recent media available.</div>';
+    return;
+  }
+
+  const sessions = Array.isArray(snapshot.active_sessions) ? snapshot.active_sessions : [];
+  const recentItems = Array.isArray(snapshot.recent_items) ? snapshot.recent_items : [];
+  const watchingLabel = sessions.length
+    ? `${sessions.length} watching now`
+    : 'Nobody is watching right now';
+  const userLabel = snapshot.resolved_user_name ? `Latest for ${snapshot.resolved_user_name}` : 'Latest additions';
+  statusEl.textContent = `${watchingLabel} · ${userLabel}`;
+  sessionsTitleEl.style.display = sessions.length ? '' : 'none';
+
+  sessionsListEl.innerHTML = sessions.length
+    ? sessions.map(session => {
+        const title = formatEmbySessionItem(session.item || {});
+        const progress = Number.isFinite(session.progress_percent)
+          ? Math.max(0, Math.min(100, session.progress_percent))
+          : 0;
+        const progressLabel = Number.isFinite(session.progress_percent)
+          ? `${progress.toFixed(0)}%`
+          : '';
+        const avatar = session.user_image_url
+          ? `<img class="emby-panel-avatar" src="${escapeHtml(session.user_image_url)}" alt="" loading="lazy" onerror="this.style.display='none'"/>`
+          : '';
+        return `<div class="emby-panel-card">
+          ${avatar}
+          <div class="emby-panel-card-content">
+            <div class="emby-panel-session-header">
+              <div class="emby-panel-card-title">${escapeHtml(title)}</div>
+              <div class="emby-panel-session-progress-label">${escapeHtml(progressLabel)}</div>
+            </div>
+            <div class="emby-panel-card-meta">${escapeHtml(session.user_name || 'Unknown user')}</div>
+            <div class="emby-panel-progress" aria-label="Playback progress">
+              <div class="emby-panel-progress-fill" style="width:${progress}%"></div>
+            </div>
+          </div>
+        </div>`;
+      }).join('')
+    : '';
+
+  latestListEl.innerHTML = recentItems.length
+    ? recentItems.map(item => {
+        const title = formatEmbyRecentItem(item);
+        const type = item?.type || 'Item';
+        const created = item?.date_created ? timeAgo(item.date_created) : 'Unknown date';
+        const poster = item?.image_url
+          ? `<img class="emby-panel-card-poster" src="${escapeHtml(item.image_url)}" alt="" loading="lazy" onerror="this.style.display='none'"/>`
+          : '';
+        return `<div class="emby-panel-card">
+          ${poster}
+          <div class="emby-panel-card-content">
+            <div class="emby-panel-card-title">${escapeHtml(title)}</div>
+            <div class="emby-panel-card-meta">${escapeHtml(`${type} • Added ${created}`)}</div>
+          </div>
+        </div>`;
+      }).join('')
+    : '<div class="emby-panel-empty">No recent movies or episodes found.</div>';
+}
+
+function renderOverviewEmbyFromCache() {
+  const panels = Array.from(document.querySelectorAll('.overview-panel[data-widget-type="emby"]'));
+  panels.forEach(panel => {
+    const widget = getOverviewWidgetForElement(panel);
+    const config = getOverviewEmbyConfig(widget);
+    if (!config.host || !config.token) {
+      renderOverviewEmbySnapshot(panel, {
+        error: 'Emby not configured',
+        detail: 'Open the widget settings to add your Emby host and token.',
+      });
+      return;
+    }
+    renderOverviewEmbySnapshot(panel, latestOverviewEmbySnapshots[widget.instance_id] || null);
+  });
+}
+
+function renderOverviewEmbyHealthFromCache() {
+  const panels = Array.from(document.querySelectorAll('.overview-panel[data-widget-type="emby"]'));
+  panels.forEach(panel => {
+    const widget = getOverviewWidgetForElement(panel);
+    const config = getOverviewEmbyConfig(widget);
+    const indicator = panel.querySelector('[data-role="emby-health-indicator"]');
+    const dot = indicator?.querySelector('.status-dot');
+    if (!indicator || !dot) return;
+    const health = widget ? latestOverviewEmbyHealth[widget.instance_id] : null;
+    let dotClass = 'unknown';
+    let label = 'Checking Emby server status';
+    if (!config.host || !config.token) {
+      label = 'Emby not configured';
+    } else if (health?.ok === true) {
+      dotClass = 'up';
+      label = 'Emby server reachable';
+    } else if (health?.ok === false) {
+      dotClass = 'down';
+      label = 'Emby server unreachable';
+    }
+    dot.className = `status-dot ${dotClass}`;
+    indicator.title = label;
+    indicator.setAttribute('aria-label', label);
+  });
+}
+
+async function fetchOverviewEmbyData() {
+  const embyWidgets = (overviewWidgetLayout || []).filter(widget => widget.type === 'emby');
+  if (!embyWidgets.length) {
+    latestOverviewEmbySnapshots = {};
+    hasLoadedOverviewEmby = true;
+    renderOverviewEmbyFromCache();
+    return;
+  }
+
+  const entries = await Promise.all(embyWidgets.map(async widget => {
+    const config = getOverviewEmbyConfig(widget);
+    if (!config.host || !config.token) {
+      return [widget.instance_id, {
+        error: 'Emby not configured',
+        detail: 'Open the widget settings to add your Emby host and token.',
+      }];
+    }
+    try {
+      const resp = await fetch('/api/emby/widget-data', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(config),
+      });
+      const payload = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        return [widget.instance_id, {
+          error: payload.error || 'Emby request failed',
+          detail: payload.detail || 'Unable to load data from Emby.',
+        }];
+      }
+      return [widget.instance_id, payload];
+    } catch (err) {
+      return [widget.instance_id, {
+        error: 'Emby request failed',
+        detail: err?.message || 'Unable to load data from Emby.',
+      }];
+    }
+  }));
+
+  latestOverviewEmbySnapshots = Object.fromEntries(entries);
+  hasLoadedOverviewEmby = true;
+  renderOverviewEmbyFromCache();
+}
+
+async function fetchOverviewEmbyHealth() {
+  const embyWidgets = (overviewWidgetLayout || []).filter(widget => widget.type === 'emby');
+  if (!embyWidgets.length) {
+    latestOverviewEmbyHealth = {};
+    renderOverviewEmbyHealthFromCache();
+    return;
+  }
+
+  const entries = await Promise.all(embyWidgets.map(async widget => {
+    const config = getOverviewEmbyConfig(widget);
+    if (!config.host || !config.token) {
+      return [widget.instance_id, { ok: null }];
+    }
+    try {
+      const resp = await fetch('/api/emby/ping', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ host: config.host, token: config.token }),
+      });
+      const payload = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        return [widget.instance_id, {
+          ok: false,
+          detail: payload.detail || payload.error || 'Unable to reach Emby.',
+        }];
+      }
+      return [widget.instance_id, {
+        ok: payload.ok === true,
+        status_code: payload.status_code,
+      }];
+    } catch (err) {
+      return [widget.instance_id, {
+        ok: false,
+        detail: err?.message || 'Unable to reach Emby.',
+      }];
+    }
+  }));
+
+  latestOverviewEmbyHealth = Object.fromEntries(entries);
+  renderOverviewEmbyHealthFromCache();
+}
+
+function startOverviewEmbyPoll() {
+  stopOverviewEmbyPoll();
+  fetchOverviewEmbyData();
+  embyOverviewTimer = setInterval(fetchOverviewEmbyData, 15000);
+}
+
+function stopOverviewEmbyPoll() {
+  if (embyOverviewTimer) {
+    clearInterval(embyOverviewTimer);
+    embyOverviewTimer = null;
+  }
+}
+
+function startOverviewEmbyHealthPoll() {
+  stopOverviewEmbyHealthPoll();
+  fetchOverviewEmbyHealth();
+  embyHealthTimer = setInterval(fetchOverviewEmbyHealth, 60000);
+}
+
+function stopOverviewEmbyHealthPoll() {
+  if (embyHealthTimer) {
+    clearInterval(embyHealthTimer);
+    embyHealthTimer = null;
+  }
 }
 
 function fetchHostStats() {
@@ -2635,6 +2965,8 @@ function refreshOverviewWidgetsFromCache() {
   if (hasLoadedOverviewDriveData) renderOverviewDrives(drivesCache);
   if (hasLoadedOverviewServiceData) renderOverviewServices(servicesCache);
   if (hasLoadedOverviewDebrid) renderOverviewRdtClient(latestOverviewDebridStatus, debridQueueSnapshot);
+  if (hasLoadedOverviewEmby) renderOverviewEmbyFromCache();
+  renderOverviewEmbyHealthFromCache();
 }
 
 function replaceOverviewWidgetMarkup(widgetsHtml) {
@@ -2935,6 +3267,137 @@ async function submitOverviewHostWidgetModal() {
     console.error('Failed to save host widget settings', err);
     alert('Unable to save host selection. Please try again.');
     overviewHostWidgetState.saving = false;
+    if (saveBtn) saveBtn.disabled = false;
+  }
+}
+
+function setOverviewEmbyUsers(users, preferredUserId = '') {
+  const select = document.getElementById('overview-emby-user-select');
+  const help = document.getElementById('overview-emby-user-help');
+  const userIdInput = document.getElementById('overview-emby-user-id-input');
+  if (!select) return;
+  const normalizedPreferred = normalizeOverviewEmbyString(preferredUserId);
+  const normalizedUsers = Array.isArray(users) ? users : [];
+  select.innerHTML = ['<option value="">Auto-detect user</option>'].concat(
+    normalizedUsers.map(user => (
+      `<option value="${escapeHtml(user.id || '')}">${escapeHtml(user.name || 'Unnamed user')}</option>`
+    ))
+  ).join('');
+  if (normalizedPreferred) select.value = normalizedPreferred;
+  if (select.value !== normalizedPreferred) select.value = '';
+  if (userIdInput && normalizedPreferred) userIdInput.value = normalizedPreferred;
+  if (help) {
+    help.textContent = normalizedUsers.length
+      ? 'Auto uses the first user returned by Emby. Pick one here if you want a specific library perspective.'
+      : 'No users loaded yet. Click Refresh Users after entering a host and token, or paste a user ID override below.';
+  }
+  overviewEmbyWidgetState.lastUsers = normalizedUsers;
+}
+
+async function refreshOverviewEmbyUsers() {
+  const hostInput = document.getElementById('overview-emby-host-input');
+  const tokenInput = document.getElementById('overview-emby-token-input');
+  const button = document.getElementById('overview-emby-refresh-users-btn');
+  const help = document.getElementById('overview-emby-user-help');
+  const host = normalizeOverviewEmbyString(hostInput?.value);
+  const token = normalizeOverviewEmbyString(tokenInput?.value);
+  if (!host || !token) {
+    if (help) help.textContent = 'Enter both the Emby host and token before refreshing users.';
+    setOverviewEmbyUsers([], '');
+    return;
+  }
+  if (button) button.disabled = true;
+  overviewEmbyWidgetState.loadingUsers = true;
+  if (help) help.textContent = 'Loading users from Emby…';
+  try {
+    const resp = await fetch('/api/emby/users', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ host, token }),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(payload.error || payload.detail || 'Unable to load users');
+    setOverviewEmbyUsers(payload.users || [], '');
+  } catch (err) {
+    setOverviewEmbyUsers([], '');
+    if (help) help.textContent = err?.message || 'Unable to load users from Emby.';
+  } finally {
+    overviewEmbyWidgetState.loadingUsers = false;
+    if (button) button.disabled = false;
+  }
+}
+
+async function openOverviewEmbyWidgetModal(instanceId) {
+  const widget = getOverviewWidgetInstance(instanceId);
+  const modal = document.getElementById('overview-emby-widget-modal');
+  const hostInput = document.getElementById('overview-emby-host-input');
+  const tokenInput = document.getElementById('overview-emby-token-input');
+  const userIdInput = document.getElementById('overview-emby-user-id-input');
+  const saveBtn = document.getElementById('overview-emby-widget-save-btn');
+  if (!widget || !modal || !hostInput || !tokenInput || !userIdInput) return;
+  overviewEmbyWidgetState = { instanceId, saving: false, loadingUsers: false, lastUsers: [] };
+  const config = getOverviewEmbyConfig(widget);
+  hostInput.value = config.host;
+  tokenInput.value = config.token;
+  userIdInput.value = config.user_id;
+  setOverviewEmbyUsers([], config.user_id);
+  if (saveBtn) saveBtn.disabled = false;
+  modal.classList.add('open');
+  window.setTimeout(() => hostInput.focus(), 0);
+  if (config.host && config.token) {
+    await refreshOverviewEmbyUsers();
+    setOverviewEmbyUsers(overviewEmbyWidgetState.lastUsers, config.user_id);
+  }
+}
+
+function closeOverviewEmbyWidgetModal() {
+  if (overviewEmbyWidgetState.saving) return;
+  overviewEmbyWidgetState = { instanceId: null, saving: false, loadingUsers: false, lastUsers: [] };
+  const modal = document.getElementById('overview-emby-widget-modal');
+  const hostInput = document.getElementById('overview-emby-host-input');
+  const tokenInput = document.getElementById('overview-emby-token-input');
+  const userIdInput = document.getElementById('overview-emby-user-id-input');
+  if (hostInput) hostInput.value = '';
+  if (tokenInput) tokenInput.value = '';
+  if (userIdInput) userIdInput.value = '';
+  setOverviewEmbyUsers([], '');
+  if (modal) modal.classList.remove('open');
+}
+
+async function submitOverviewEmbyWidgetModal() {
+  const instanceId = overviewEmbyWidgetState.instanceId;
+  if (!instanceId || overviewEmbyWidgetState.saving) return;
+  const hostInput = document.getElementById('overview-emby-host-input');
+  const tokenInput = document.getElementById('overview-emby-token-input');
+  const userSelect = document.getElementById('overview-emby-user-select');
+  const userIdInput = document.getElementById('overview-emby-user-id-input');
+  const saveBtn = document.getElementById('overview-emby-widget-save-btn');
+  const host = normalizeOverviewEmbyString(hostInput?.value);
+  const token = normalizeOverviewEmbyString(tokenInput?.value);
+  const userId = normalizeOverviewEmbyString(userIdInput?.value) || normalizeOverviewEmbyString(userSelect?.value);
+  if (!host || !token) {
+    alert('Emby host and token are required.');
+    return;
+  }
+  const nextLayout = cloneOverviewWidgetLayout(overviewWidgetLayout).map(item => (
+    item.instance_id === instanceId
+      ? { ...item, config: { ...(item.config || {}), host, token, user_id: userId } }
+      : item
+  ));
+  overviewEmbyWidgetState.saving = true;
+  if (saveBtn) saveBtn.disabled = true;
+  try {
+    await saveOverviewWidgetLayout(nextLayout);
+    overviewEmbyWidgetState.saving = false;
+    closeOverviewEmbyWidgetModal();
+    if (currentSection === 'overview') {
+      startOverviewEmbyPoll();
+      startOverviewEmbyHealthPoll();
+    }
+  } catch (err) {
+    console.error('Failed to save Emby widget settings', err);
+    alert('Unable to save Emby widget settings. Please try again.');
+    overviewEmbyWidgetState.saving = false;
     if (saveBtn) saveBtn.disabled = false;
   }
 }
@@ -3876,6 +4339,7 @@ document.getElementById('host-modal').addEventListener('click', e => { if(e.targ
 document.getElementById('reorder-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeReorderModal(); });
 document.getElementById('overview-widget-rename-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeOverviewWidgetRenameModal(); });
 document.getElementById('overview-host-widget-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeOverviewHostWidgetModal(); });
+document.getElementById('overview-emby-widget-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeOverviewEmbyWidgetModal(); });
 document.getElementById('logo-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeLogoModal(); });
 document.getElementById('debrid-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeDebridModal(); });
 document.getElementById('overview-debrid-magnet-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeOverviewDebridMagnetModal(); });
@@ -3897,6 +4361,46 @@ document.getElementById('overview-host-widget-select').addEventListener('keydown
     event.preventDefault();
     closeOverviewHostWidgetModal();
   }
+});
+document.getElementById('overview-emby-host-input').addEventListener('keydown', event => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    submitOverviewEmbyWidgetModal();
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    closeOverviewEmbyWidgetModal();
+  }
+});
+document.getElementById('overview-emby-token-input').addEventListener('keydown', event => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    submitOverviewEmbyWidgetModal();
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    closeOverviewEmbyWidgetModal();
+  }
+});
+document.getElementById('overview-emby-user-select').addEventListener('keydown', event => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    submitOverviewEmbyWidgetModal();
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    closeOverviewEmbyWidgetModal();
+  }
+});
+document.getElementById('overview-emby-user-id-input').addEventListener('keydown', event => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    submitOverviewEmbyWidgetModal();
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    closeOverviewEmbyWidgetModal();
+  }
+});
+document.getElementById('overview-emby-user-select').addEventListener('change', event => {
+  const userIdInput = document.getElementById('overview-emby-user-id-input');
+  if (userIdInput) userIdInput.value = normalizeOverviewEmbyString(event.target?.value);
 });
 document.getElementById('overview-debrid-magnet-input').addEventListener('keydown', event => {
   if (event.key === 'Enter') {

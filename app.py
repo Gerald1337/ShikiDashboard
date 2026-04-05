@@ -1,5 +1,6 @@
 from datetime import datetime
 import json
+from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from flask import Flask, jsonify, render_template_string, request
 import requests as req_lib
@@ -54,6 +55,7 @@ from widgets import (
 
 app = Flask(__name__)
 TAB_SECTIONS = {"overview", "services", "hosts", "disks", "debrid"}
+EMBY_RECENT_LIMIT = 6
 
 
 def parse_int(value, default, minimum=None, maximum=None):
@@ -121,6 +123,255 @@ def proxy_debrid_post(endpoint_path, payload, failure_message):
     except req_lib.RequestException as exc:
         return jsonify({"error": failure_message, "detail": str(exc)}), 502
     return make_debrid_proxy_response(resp)
+
+
+def normalize_emby_host(raw_host):
+    host = (raw_host or "").strip()
+    if not host:
+        return ""
+    if "://" not in host:
+        host = f"http://{host}"
+    parsed = urlsplit(host)
+    path = (parsed.path or "").rstrip("/")
+    if not path:
+        path = "/emby"
+    normalized = parsed._replace(path=path, query="", fragment="")
+    return urlunsplit(normalized).rstrip("/")
+
+
+def make_emby_headers(token):
+    return {"X-Emby-Token": token}
+
+
+def fetch_emby_json(host, token, path, *, params=None, timeout=10):
+    url = f"{host}{path}"
+    resp = req_lib.get(url, headers=make_emby_headers(token), params=params, timeout=timeout)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def ping_emby_server(host, token, timeout=5):
+    url = f"{host}/System/Ping"
+    resp = req_lib.get(url, headers=make_emby_headers(token), timeout=timeout)
+    resp.raise_for_status()
+    return {
+        "ok": True,
+        "status_code": resp.status_code,
+    }
+
+
+def build_emby_image_url(host, token, item_id, *, item_type="Items", max_height=None, max_width=None):
+    normalized_id = str(item_id or "").strip()
+    if not normalized_id:
+        return None
+    query = {"api_key": token}
+    if max_height:
+        query["MaxHeight"] = int(max_height)
+    if max_width:
+        query["MaxWidth"] = int(max_width)
+    return f"{host}/{item_type}/{normalized_id}/Images/Primary?{urlencode(query)}"
+
+
+def normalize_emby_user(item):
+    if not isinstance(item, dict):
+        return None
+    user_id = str(item.get("Id") or item.get("id") or "").strip()
+    if not user_id:
+        return None
+    return {
+        "id": user_id,
+        "name": (item.get("Name") or item.get("name") or "").strip() or "Unnamed user",
+    }
+
+
+def fetch_emby_users(host, token):
+    user_sources = []
+    for path in ("/Users/Query", "/Users/Public"):
+        try:
+            payload = fetch_emby_json(host, token, path)
+        except req_lib.HTTPError as exc:
+            status_code = exc.response.status_code if exc.response is not None else None
+            if status_code in {401, 403, 404}:
+                continue
+            raise
+        items = payload.get("Items") if isinstance(payload, dict) else payload
+        users = []
+        for item in items or []:
+            normalized = normalize_emby_user(item)
+            if normalized:
+                users.append(normalized)
+        if users:
+            user_sources = users
+            break
+    return user_sources
+
+
+def choose_emby_user(host, token, requested_user_id=None):
+    users = fetch_emby_users(host, token)
+    resolved = None
+    if requested_user_id:
+        resolved = next((user for user in users if user["id"] == str(requested_user_id).strip()), None)
+        if resolved is None:
+            requested = str(requested_user_id).strip()
+            if requested:
+                resolved = {"id": requested, "name": "Selected user"}
+    if resolved is None and users:
+        resolved = users[0]
+    return resolved, users
+
+
+def normalize_emby_session(session):
+    if not isinstance(session, dict) or not isinstance(session.get("NowPlayingItem"), dict):
+        return None
+    item = session.get("NowPlayingItem") or {}
+    play_state = session.get("PlayState") or {}
+    runtime_ticks = item.get("RunTimeTicks")
+    position_ticks = play_state.get("PositionTicks")
+    progress_percent = None
+    try:
+        runtime_ticks = int(runtime_ticks)
+        position_ticks = int(position_ticks)
+        if runtime_ticks > 0 and position_ticks >= 0:
+            progress_percent = max(0.0, min(100.0, (position_ticks / runtime_ticks) * 100))
+    except (TypeError, ValueError, ZeroDivisionError):
+        progress_percent = None
+    return {
+        "user_id": str(session.get("UserId") or "").strip(),
+        "user_name": (session.get("UserName") or "").strip() or "Unknown user",
+        "device_name": (session.get("DeviceName") or "").strip() or (session.get("Client") or "").strip() or "Unknown device",
+        "client": (session.get("Client") or "").strip(),
+        "is_paused": bool(play_state.get("IsPaused")),
+        "progress_percent": round(progress_percent, 1) if progress_percent is not None else None,
+        "item": {
+            "id": str(item.get("Id") or "").strip(),
+            "name": (item.get("Name") or "").strip() or "Untitled",
+            "series_name": (item.get("SeriesName") or "").strip(),
+            "type": (item.get("Type") or "").strip(),
+            "production_year": item.get("ProductionYear"),
+            "index_number": item.get("IndexNumber"),
+            "parent_index_number": item.get("ParentIndexNumber"),
+            "series_id": str(item.get("SeriesId") or "").strip(),
+        },
+    }
+
+
+def normalize_emby_latest_item(item):
+    if not isinstance(item, dict):
+        return None
+    item_id = str(item.get("Id") or "").strip()
+    if not item_id:
+        return None
+    return {
+        "id": item_id,
+        "name": (item.get("Name") or "").strip() or "Untitled",
+        "series_name": (item.get("SeriesName") or "").strip(),
+        "series_id": str(item.get("SeriesId") or "").strip(),
+        "type": (item.get("Type") or "").strip(),
+        "date_created": item.get("DateCreated"),
+        "production_year": item.get("ProductionYear"),
+        "index_number": item.get("IndexNumber"),
+        "parent_index_number": item.get("ParentIndexNumber"),
+    }
+
+
+def group_emby_recent_items(items, limit):
+    grouped = []
+    seen = set()
+    for item in items:
+        item_type = (item.get("type") or "").lower()
+        if item_type == "episode":
+            group_id = item.get("series_id") or item.get("id")
+            display_name = item.get("series_name") or item.get("name") or "Untitled"
+            grouped_type = "Series"
+            image_item_id = item.get("series_id") or item.get("id")
+        else:
+            group_id = item.get("id")
+            display_name = item.get("name") or "Untitled"
+            grouped_type = item.get("type") or "Item"
+            image_item_id = item.get("id")
+        if not group_id or group_id in seen:
+            continue
+        grouped.append({
+            **item,
+            "name": display_name,
+            "type": grouped_type,
+            "image_item_id": image_item_id,
+        })
+        seen.add(group_id)
+        if len(grouped) >= limit:
+            break
+    return grouped
+
+
+def build_emby_widget_payload(host, token, user_id=None):
+    normalized_host = normalize_emby_host(host)
+    normalized_token = (token or "").strip()
+    if not normalized_host or not normalized_token:
+        raise ValueError("Emby host and token are required")
+
+    resolved_user, users = choose_emby_user(normalized_host, normalized_token, user_id)
+    if resolved_user is None:
+        raise ValueError("No Emby users were found for this server")
+
+    sessions_payload = fetch_emby_json(normalized_host, normalized_token, "/Sessions")
+    latest_payload = fetch_emby_json(
+        normalized_host,
+        normalized_token,
+        f"/Users/{resolved_user['id']}/Items",
+        params={
+            "Recursive": "true",
+            "IncludeItemTypes": "Movie,Episode",
+            "SortBy": "DateCreated",
+            "SortOrder": "Descending",
+            "Limit": max(EMBY_RECENT_LIMIT * 10, 50),
+            "Fields": "DateCreated",
+        },
+    )
+
+    sessions = []
+    for item in sessions_payload or []:
+        normalized = normalize_emby_session(item)
+        if normalized:
+            sessions.append(normalized)
+
+    latest_items = []
+    latest_payload_items = latest_payload.get("Items") if isinstance(latest_payload, dict) else latest_payload
+    for item in latest_payload_items or []:
+        normalized = normalize_emby_latest_item(item)
+        if normalized:
+            latest_items.append(normalized)
+
+    grouped_recent_items = group_emby_recent_items(latest_items, EMBY_RECENT_LIMIT)
+
+    for session in sessions:
+        session["user_image_url"] = build_emby_image_url(
+            normalized_host,
+            normalized_token,
+            session.get("user_id"),
+            item_type="Users",
+            max_height=48,
+            max_width=48,
+        )
+
+    for item in grouped_recent_items:
+        item["image_url"] = build_emby_image_url(
+            normalized_host,
+            normalized_token,
+            item.get("image_item_id") or item.get("id"),
+            item_type="Items",
+            max_height=180,
+            max_width=120,
+        )
+
+    return {
+        "host": normalized_host,
+        "resolved_user_id": resolved_user["id"],
+        "resolved_user_name": resolved_user["name"],
+        "users": users,
+        "active_sessions": sessions,
+        "recent_items": grouped_recent_items[:EMBY_RECENT_LIMIT],
+        "updated_at": datetime.now().isoformat(),
+    }
 
 def get_saved_overview_widget_layout():
     raw = get_app_setting("overview_panel_order")
@@ -254,6 +505,78 @@ def api_debrid_edit_queue_retry():
         {"torrentId": torrent_id},
         "Failed to retry torrent in queue",
     )
+
+
+@app.route("/api/emby/users", methods=["POST"])
+def api_emby_users():
+    data = request.get_json(silent=True) or {}
+    host = data.get("host")
+    token = data.get("token")
+    normalized_host = normalize_emby_host(host)
+    normalized_token = (token or "").strip()
+    if not normalized_host or not normalized_token:
+        return jsonify({"error": "host and token are required"}), 400
+    try:
+        users = fetch_emby_users(normalized_host, normalized_token)
+    except req_lib.HTTPError as exc:
+        status_code = exc.response.status_code if exc.response is not None else 502
+        detail = exc.response.text.strip() if exc.response is not None else str(exc)
+        return jsonify({"error": "Failed to load Emby users", "detail": detail or str(exc)}), status_code
+    except req_lib.RequestException as exc:
+        return jsonify({"error": "Failed to load Emby users", "detail": str(exc)}), 502
+    return jsonify({
+        "host": normalized_host,
+        "users": users,
+    })
+
+
+@app.route("/api/emby/widget-data", methods=["POST"])
+def api_emby_widget_data():
+    data = request.get_json(silent=True) or {}
+    host = data.get("host")
+    token = data.get("token")
+    user_id = data.get("user_id")
+    try:
+        payload = build_emby_widget_payload(host, token, user_id=user_id)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except req_lib.HTTPError as exc:
+        status_code = exc.response.status_code if exc.response is not None else 502
+        detail = exc.response.text.strip() if exc.response is not None else str(exc)
+        return jsonify({"error": "Failed to fetch Emby data", "detail": detail or str(exc)}), status_code
+    except req_lib.RequestException as exc:
+        return jsonify({"error": "Failed to fetch Emby data", "detail": str(exc)}), 502
+    return jsonify(payload)
+
+
+@app.route("/api/emby/ping", methods=["POST"])
+def api_emby_ping():
+    data = request.get_json(silent=True) or {}
+    host = normalize_emby_host(data.get("host"))
+    token = (data.get("token") or "").strip()
+    if not host or not token:
+        return jsonify({"error": "host and token are required"}), 400
+    try:
+        payload = ping_emby_server(host, token)
+    except req_lib.HTTPError as exc:
+        status_code = exc.response.status_code if exc.response is not None else 502
+        detail = exc.response.text.strip() if exc.response is not None else str(exc)
+        return jsonify({
+            "ok": False,
+            "host": host,
+            "status_code": status_code,
+            "detail": detail or str(exc),
+        }), status_code
+    except req_lib.RequestException as exc:
+        return jsonify({
+            "ok": False,
+            "host": host,
+            "detail": str(exc),
+        }), 502
+    return jsonify({
+        "host": host,
+        **payload,
+    })
 
 
 def apply_saved_drive_order(drives):
